@@ -1,0 +1,44 @@
+name: Reusable Deploy Kustomize
+
+on:
+  workflow_call:
+    inputs:
+      kustomize_path:
+        description: Caminho do overlay Kustomize que sera aplicado no cluster.
+        required: true
+        type: string
+      ref:
+        description: Branch, tag ou SHA usado no checkout antes do deploy.
+        required: false
+        type: string
+        default: main
+    secrets:
+      KUBE_CONFIG:
+        required: true
+
+jobs:
+  deploy:
+    name: Deploy to Kubernetes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Configure kubeconfig
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.kube"
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+
+      - name: Apply Kustomize overlay
+        shell: bash
+        run: kubectl apply -k "${{ inputs.kustomize_path }}"

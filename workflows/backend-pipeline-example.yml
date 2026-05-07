@@ -1,0 +1,23 @@
+name: Backend Pipeline Example
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "api/**"
+      - ".github/workflows/**"
+
+jobs:
+  pipeline:
+    uses: ./.github/workflows/app-pipeline.yml
+    with:
+      app_name: example-backend
+      stack_type: backend
+      context: api
+      image_name: ghcr.io/${{ github.repository_owner }}/example-backend
+      kustomize_path: templates-pipeline/kustomize-share/app/example-backend
+      image_alias: app-image
+      deploy: true
+      deploy_ref: main
+    secrets: inherit

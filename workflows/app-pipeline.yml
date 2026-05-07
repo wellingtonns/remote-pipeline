@@ -1,0 +1,132 @@
+name: Reusable App Pipeline
+
+on:
+  workflow_call:
+    inputs:
+      app_name:
+        description: Nome logico da aplicacao.
+        required: true
+        type: string
+      stack_type:
+        description: Tipo da stack. Valores aceitos: frontend ou backend.
+        required: true
+        type: string
+      context:
+        description: Pasta do projeto.
+        required: false
+        type: string
+        default: .
+      image_name:
+        description: Nome completo da imagem sem tag.
+        required: true
+        type: string
+      registry:
+        description: Registry usado no login.
+        required: false
+        type: string
+        default: ghcr.io
+      image_tag:
+        description: Tag da imagem. Quando vazio, usa o SHA curto do commit.
+        required: false
+        type: string
+        default: ""
+      push:
+        description: Publicar imagem no registry.
+        required: false
+        type: boolean
+        default: true
+      kustomize_path:
+        description: Caminho do overlay Kustomize da aplicacao.
+        required: true
+        type: string
+      image_alias:
+        description: Nome da imagem na base Kustomize.
+        required: false
+        type: string
+        default: app-image
+      deploy:
+        description: Aplicar o overlay no Kubernetes apos atualizar a tag.
+        required: false
+        type: boolean
+        default: true
+      deploy_ref:
+        description: Branch, tag ou SHA usado no checkout antes do deploy.
+        required: false
+        type: string
+        default: main
+    secrets:
+      REGISTRY_USERNAME:
+        required: false
+      REGISTRY_PASSWORD:
+        required: false
+      KUBE_CONFIG:
+        required: false
+
+jobs:
+  validate:
+    name: Validate stack type
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate stack_type input
+        shell: bash
+        run: |
+          case "${{ inputs.stack_type }}" in
+            frontend|backend)
+              echo "stack_type=${{ inputs.stack_type }}"
+              ;;
+            *)
+              echo "Invalid stack_type: ${{ inputs.stack_type }}. Use frontend or backend."
+              exit 1
+              ;;
+          esac
+
+  build-frontend:
+    name: Build frontend
+    needs: validate
+    if: ${{ inputs.stack_type == 'frontend' }}
+    uses: ./.github/workflows/build-frontend-nixpacks.yml
+    with:
+      app_name: ${{ inputs.app_name }}
+      context: ${{ inputs.context }}
+      image_name: ${{ inputs.image_name }}
+      registry: ${{ inputs.registry }}
+      image_tag: ${{ inputs.image_tag }}
+      push: ${{ inputs.push }}
+    secrets: inherit
+
+  build-backend:
+    name: Build backend
+    needs: validate
+    if: ${{ inputs.stack_type == 'backend' }}
+    uses: ./.github/workflows/build-backend-nixpacks.yml
+    with:
+      app_name: ${{ inputs.app_name }}
+      context: ${{ inputs.context }}
+      image_name: ${{ inputs.image_name }}
+      registry: ${{ inputs.registry }}
+      image_tag: ${{ inputs.image_tag }}
+      push: ${{ inputs.push }}
+    secrets: inherit
+
+  update-image:
+    name: Update Kustomize image
+    needs:
+      - build-frontend
+      - build-backend
+    if: ${{ always() && !failure() && !cancelled() }}
+    uses: ./.github/workflows/update-kustomize-image.yml
+    with:
+      kustomize_path: ${{ inputs.kustomize_path }}
+      image_name: ${{ inputs.image_name }}
+      image_alias: ${{ inputs.image_alias }}
+      image_tag: ${{ needs.build-frontend.outputs.image_tag || needs.build-backend.outputs.image_tag }}
+
+  deploy:
+    name: Deploy
+    needs: update-image
+    if: ${{ inputs.deploy }}
+    uses: ./.github/workflows/deploy-kustomize.yml
+    with:
+      kustomize_path: ${{ inputs.kustomize_path }}
+      ref: ${{ inputs.deploy_ref }}
+    secrets: inherit

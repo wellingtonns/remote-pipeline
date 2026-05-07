@@ -1,0 +1,80 @@
+name: Reusable Update Kustomize Image
+
+on:
+  workflow_call:
+    inputs:
+      kustomize_path:
+        description: Caminho do overlay Kustomize. Exemplo templates-pipeline/kustomize-share/app/app-clinica.
+        required: true
+        type: string
+      image_name:
+        description: Nome real da imagem que ficara em newName.
+        required: true
+        type: string
+      image_alias:
+        description: Nome da imagem na base Kustomize. Use app-image para a base compartilhada.
+        required: false
+        type: string
+        default: ""
+      image_tag:
+        description: Nova tag que sera gravada em newTag.
+        required: true
+        type: string
+      commit_message:
+        description: Mensagem do commit de atualizacao.
+        required: false
+        type: string
+        default: "chore: update kustomize image tag"
+      git_user_name:
+        description: Usuario Git para o commit.
+        required: false
+        type: string
+        default: "github-actions[bot]"
+      git_user_email:
+        description: Email Git para o commit.
+        required: false
+        type: string
+        default: "41898282+github-actions[bot]@users.noreply.github.com"
+
+jobs:
+  update:
+    name: Update image tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Setup Kustomize
+        uses: imranismail/setup-kustomize@v2
+
+      - name: Update image tag with Kustomize
+        working-directory: ${{ inputs.kustomize_path }}
+        shell: bash
+        run: |
+          IMAGE_ALIAS="${{ inputs.image_alias }}"
+          if [ -z "$IMAGE_ALIAS" ]; then
+            IMAGE_ALIAS="${{ inputs.image_name }}"
+          fi
+
+          kustomize edit set image "$IMAGE_ALIAS=${{ inputs.image_name }}:${{ inputs.image_tag }}"
+          kustomize build .
+
+      - name: Commit and push changes
+        shell: bash
+        run: |
+          git config user.name "${{ inputs.git_user_name }}"
+          git config user.email "${{ inputs.git_user_email }}"
+
+          if git diff --quiet; then
+            echo "No Kustomize changes to commit."
+            exit 0
+          fi
+
+          git add "${{ inputs.kustomize_path }}/kustomization.yaml"
+          git commit -m "${{ inputs.commit_message }}: ${{ inputs.image_tag }}"
+          git push
