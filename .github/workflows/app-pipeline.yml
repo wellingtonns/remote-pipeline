@@ -58,6 +58,11 @@ on:
         required: false
         type: string
         default: app-image
+      update_kustomize:
+        description: Atualizar a tag da imagem no repositorio Kustomize.
+        required: false
+        type: boolean
+        default: true
       deploy:
         description: Aplicar o overlay no Kubernetes apos atualizar a tag.
         required: false
@@ -76,7 +81,7 @@ on:
       KUBE_CONFIG:
         required: false
       KUSTOMIZE_REPO_TOKEN:
-        required: true
+        required: false
 
 jobs:
   validate:
@@ -129,7 +134,7 @@ jobs:
     needs:
       - build-frontend
       - build-backend
-    if: ${{ always() && !failure() && !cancelled() }}
+    if: ${{ inputs.update_kustomize && always() && !failure() && !cancelled() }}
     uses: ./.github/workflows/update-kustomize-image.yml
     with:
       kustomize_path: ${{ inputs.kustomize_path }}
@@ -144,7 +149,7 @@ jobs:
   deploy:
     name: Deploy
     needs: update-image
-    if: ${{ inputs.deploy }}
+    if: ${{ inputs.deploy && always() && !failure() && !cancelled() }}
     uses: ./.github/workflows/deploy-kustomize.yml
     with:
       kustomize_path: ${{ inputs.kustomize_path }}
