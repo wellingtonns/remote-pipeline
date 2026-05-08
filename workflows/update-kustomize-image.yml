@@ -4,9 +4,23 @@ on:
   workflow_call:
     inputs:
       kustomize_path:
-        description: Caminho do overlay Kustomize. Exemplo templates-pipeline/kustomize-share/app/app-clinica.
+        description: Caminho do overlay dentro do repositorio Kustomize. Exemplo app/app-clinica.
         required: true
         type: string
+      kustomize_repository:
+        description: Repositorio que contem os manifests Kustomize. Exemplo wellingtonns/kustomize-share.
+        required: true
+        type: string
+      kustomize_ref:
+        description: Branch do repositorio Kustomize.
+        required: false
+        type: string
+        default: main
+      kustomize_checkout_path:
+        description: Pasta local onde o repositorio Kustomize sera clonado.
+        required: false
+        type: string
+        default: kustomize-share
       image_name:
         description: Nome real da imagem que ficara em newName.
         required: true
@@ -35,6 +49,9 @@ on:
         required: false
         type: string
         default: "41898282+github-actions[bot]@users.noreply.github.com"
+    secrets:
+      KUSTOMIZE_REPO_TOKEN:
+        required: true
 
 jobs:
   update:
@@ -47,13 +64,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          repository: ${{ inputs.kustomize_repository }}
+          ref: ${{ inputs.kustomize_ref }}
+          path: ${{ inputs.kustomize_checkout_path }}
+          token: ${{ secrets.KUSTOMIZE_REPO_TOKEN }}
           persist-credentials: true
 
       - name: Setup Kustomize
         uses: imranismail/setup-kustomize@v2
 
       - name: Update image tag with Kustomize
-        working-directory: ${{ inputs.kustomize_path }}
+        working-directory: ${{ inputs.kustomize_checkout_path }}/${{ inputs.kustomize_path }}
         shell: bash
         run: |
           IMAGE_ALIAS="${{ inputs.image_alias }}"
@@ -69,6 +90,7 @@ jobs:
         run: |
           git config user.name "${{ inputs.git_user_name }}"
           git config user.email "${{ inputs.git_user_email }}"
+          cd "${{ inputs.kustomize_checkout_path }}"
 
           if git diff --quiet; then
             echo "No Kustomize changes to commit."

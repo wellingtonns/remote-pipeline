@@ -39,6 +39,20 @@ on:
         description: Caminho do overlay Kustomize da aplicacao.
         required: true
         type: string
+      kustomize_repository:
+        description: Repositorio que contem os manifests Kustomize.
+        required: true
+        type: string
+      kustomize_ref:
+        description: Branch do repositorio Kustomize.
+        required: false
+        type: string
+        default: main
+      kustomize_checkout_path:
+        description: Pasta local onde o repositorio Kustomize sera clonado.
+        required: false
+        type: string
+        default: kustomize-share
       image_alias:
         description: Nome da imagem na base Kustomize.
         required: false
@@ -61,6 +75,8 @@ on:
         required: false
       KUBE_CONFIG:
         required: false
+      KUSTOMIZE_REPO_TOKEN:
+        required: true
 
 jobs:
   validate:
@@ -117,9 +133,13 @@ jobs:
     uses: ./.github/workflows/update-kustomize-image.yml
     with:
       kustomize_path: ${{ inputs.kustomize_path }}
+      kustomize_repository: ${{ inputs.kustomize_repository }}
+      kustomize_ref: ${{ inputs.kustomize_ref }}
+      kustomize_checkout_path: ${{ inputs.kustomize_checkout_path }}
       image_name: ${{ inputs.image_name }}
       image_alias: ${{ inputs.image_alias }}
       image_tag: ${{ needs.build-frontend.outputs.image_tag || needs.build-backend.outputs.image_tag }}
+    secrets: inherit
 
   deploy:
     name: Deploy
@@ -128,5 +148,7 @@ jobs:
     uses: ./.github/workflows/deploy-kustomize.yml
     with:
       kustomize_path: ${{ inputs.kustomize_path }}
+      kustomize_repository: ${{ inputs.kustomize_repository }}
+      kustomize_checkout_path: ${{ inputs.kustomize_checkout_path }}
       ref: ${{ inputs.deploy_ref }}
     secrets: inherit

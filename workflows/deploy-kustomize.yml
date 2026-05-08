@@ -4,17 +4,28 @@ on:
   workflow_call:
     inputs:
       kustomize_path:
-        description: Caminho do overlay Kustomize que sera aplicado no cluster.
+        description: Caminho do overlay dentro do repositorio Kustomize.
         required: true
         type: string
+      kustomize_repository:
+        description: Repositorio que contem os manifests Kustomize. Exemplo wellingtonns/kustomize-share.
+        required: true
+        type: string
+      kustomize_checkout_path:
+        description: Pasta local onde o repositorio Kustomize sera clonado.
+        required: false
+        type: string
+        default: kustomize-share
       ref:
-        description: Branch, tag ou SHA usado no checkout antes do deploy.
+        description: Branch, tag ou SHA do repositorio Kustomize usado no deploy.
         required: false
         type: string
         default: main
     secrets:
       KUBE_CONFIG:
         required: true
+      KUSTOMIZE_REPO_TOKEN:
+        required: false
 
 jobs:
   deploy:
@@ -27,7 +38,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          repository: ${{ inputs.kustomize_repository }}
           ref: ${{ inputs.ref }}
+          path: ${{ inputs.kustomize_checkout_path }}
+          token: ${{ secrets.KUSTOMIZE_REPO_TOKEN || github.token }}
 
       - name: Setup kubectl
         uses: azure/setup-kubectl@v4
@@ -41,4 +55,4 @@ jobs:
 
       - name: Apply Kustomize overlay
         shell: bash
-        run: kubectl apply -k "${{ inputs.kustomize_path }}"
+        run: kubectl apply -k "${{ inputs.kustomize_checkout_path }}/${{ inputs.kustomize_path }}"
