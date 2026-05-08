@@ -4,12 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       update_kustomize:
-        description: Atualizar newTag no repositorio kustomize-share.
+        description: "Atualizar newTag no repositorio kustomize-share."
         required: false
         type: boolean
         default: false
       deploy:
-        description: Aplicar deploy no Kubernetes.
+        description: "Aplicar deploy no Kubernetes."
         required: false
         type: boolean
         default: false
@@ -31,7 +31,7 @@ jobs:
       kustomize_repository: wellingtonns/kustomize-share
       kustomize_path: app/app-clinica
       image_alias: app-image
-      update_kustomize: ${{ github.event_name == 'workflow_dispatch' && inputs.update_kustomize || true }}
-      deploy: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy || true }}
+      update_kustomize: ${{ github.event_name == 'workflow_dispatch' && inputs.update_kustomize || github.event_name != 'workflow_dispatch' }}
+      deploy: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy || github.event_name != 'workflow_dispatch' }}
       deploy_ref: main
     secrets: inherit

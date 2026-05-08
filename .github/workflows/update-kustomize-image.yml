@@ -4,48 +4,48 @@ on:
   workflow_call:
     inputs:
       kustomize_path:
-        description: Caminho do overlay dentro do repositorio Kustomize. Exemplo app/app-clinica.
+        description: "Caminho do overlay dentro do repositorio Kustomize. Exemplo app/app-clinica."
         required: true
         type: string
       kustomize_repository:
-        description: Repositorio que contem os manifests Kustomize. Exemplo wellingtonns/kustomize-share.
+        description: "Repositorio que contem os manifests Kustomize. Exemplo wellingtonns/kustomize-share."
         required: true
         type: string
       kustomize_ref:
-        description: Branch do repositorio Kustomize.
+        description: "Branch do repositorio Kustomize."
         required: false
         type: string
         default: main
       kustomize_checkout_path:
-        description: Pasta local onde o repositorio Kustomize sera clonado.
+        description: "Pasta local onde o repositorio Kustomize sera clonado."
         required: false
         type: string
         default: kustomize-share
       image_name:
-        description: Nome real da imagem que ficara em newName.
+        description: "Nome real da imagem que ficara em newName."
         required: true
         type: string
       image_alias:
-        description: Nome da imagem na base Kustomize. Use app-image para a base compartilhada.
+        description: "Nome da imagem na base Kustomize. Use app-image para a base compartilhada."
         required: false
         type: string
         default: ""
       image_tag:
-        description: Nova tag que sera gravada em newTag.
+        description: "Nova tag que sera gravada em newTag."
         required: true
         type: string
       commit_message:
-        description: Mensagem do commit de atualizacao.
+        description: "Mensagem do commit de atualizacao."
         required: false
         type: string
         default: "chore: update kustomize image tag"
       git_user_name:
-        description: Usuario Git para o commit.
+        description: "Usuario Git para o commit."
         required: false
         type: string
         default: "github-actions[bot]"
       git_user_email:
-        description: Email Git para o commit.
+        description: "Email Git para o commit."
         required: false
         type: string
         default: "41898282+github-actions[bot]@users.noreply.github.com"

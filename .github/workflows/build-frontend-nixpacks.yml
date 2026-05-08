@@ -4,30 +4,30 @@ on:
   workflow_call:
     inputs:
       app_name:
-        description: Nome logico da aplicacao.
+        description: "Nome logico da aplicacao."
         required: true
         type: string
       context:
-        description: Pasta do projeto frontend.
+        description: "Pasta do projeto frontend."
         required: false
         type: string
         default: .
       image_name:
-        description: Nome completo da imagem sem tag. Exemplo ghcr.io/org/app-frontend.
+        description: "Nome completo da imagem sem tag. Exemplo ghcr.io/org/app-frontend."
         required: true
         type: string
       registry:
-        description: Registry usado no login.
+        description: "Registry usado no login."
         required: false
         type: string
         default: ghcr.io
       image_tag:
-        description: Tag da imagem. Quando vazio, usa o SHA curto do commit.
+        description: "Tag da imagem. Quando vazio, usa o SHA curto do commit."
         required: false
         type: string
         default: ""
       push:
-        description: Publicar imagem no registry.
+        description: "Publicar imagem no registry."
         required: false
         type: boolean
         default: true

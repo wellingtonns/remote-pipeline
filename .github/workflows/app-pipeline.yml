@@ -4,72 +4,72 @@ on:
   workflow_call:
     inputs:
       app_name:
-        description: Nome logico da aplicacao.
+        description: "Nome logico da aplicacao."
         required: true
         type: string
       stack_type:
-        description: Tipo da stack. Valores aceitos: frontend ou backend.
+        description: "Tipo da stack. Valores aceitos: frontend ou backend."
         required: true
         type: string
       context:
-        description: Pasta do projeto.
+        description: "Pasta do projeto."
         required: false
         type: string
         default: .
       image_name:
-        description: Nome completo da imagem sem tag.
+        description: "Nome completo da imagem sem tag."
         required: true
         type: string
       registry:
-        description: Registry usado no login.
+        description: "Registry usado no login."
         required: false
         type: string
         default: ghcr.io
       image_tag:
-        description: Tag da imagem. Quando vazio, usa o SHA curto do commit.
+        description: "Tag da imagem. Quando vazio, usa o SHA curto do commit."
         required: false
         type: string
         default: ""
       push:
-        description: Publicar imagem no registry.
+        description: "Publicar imagem no registry."
         required: false
         type: boolean
         default: true
       kustomize_path:
-        description: Caminho do overlay Kustomize da aplicacao.
+        description: "Caminho do overlay Kustomize da aplicacao."
         required: true
         type: string
       kustomize_repository:
-        description: Repositorio que contem os manifests Kustomize.
+        description: "Repositorio que contem os manifests Kustomize."
         required: true
         type: string
       kustomize_ref:
-        description: Branch do repositorio Kustomize.
+        description: "Branch do repositorio Kustomize."
         required: false
         type: string
         default: main
       kustomize_checkout_path:
-        description: Pasta local onde o repositorio Kustomize sera clonado.
+        description: "Pasta local onde o repositorio Kustomize sera clonado."
         required: false
         type: string
         default: kustomize-share
       image_alias:
-        description: Nome da imagem na base Kustomize.
+        description: "Nome da imagem na base Kustomize."
         required: false
         type: string
         default: app-image
       update_kustomize:
-        description: Atualizar a tag da imagem no repositorio Kustomize.
+        description: "Atualizar a tag da imagem no repositorio Kustomize."
         required: false
         type: boolean
         default: true
       deploy:
-        description: Aplicar o overlay no Kubernetes apos atualizar a tag.
+        description: "Aplicar o overlay no Kubernetes apos atualizar a tag."
         required: false
         type: boolean
         default: true
       deploy_ref:
-        description: Branch, tag ou SHA usado no checkout antes do deploy.
+        description: "Branch, tag ou SHA usado no checkout antes do deploy."
         required: false
         type: string
         default: main

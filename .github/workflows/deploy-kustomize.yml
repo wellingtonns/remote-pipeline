@@ -4,20 +4,20 @@ on:
   workflow_call:
     inputs:
       kustomize_path:
-        description: Caminho do overlay dentro do repositorio Kustomize.
+        description: "Caminho do overlay dentro do repositorio Kustomize."
         required: true
         type: string
       kustomize_repository:
-        description: Repositorio que contem os manifests Kustomize. Exemplo wellingtonns/kustomize-share.
+        description: "Repositorio que contem os manifests Kustomize. Exemplo wellingtonns/kustomize-share."
         required: true
         type: string
       kustomize_checkout_path:
-        description: Pasta local onde o repositorio Kustomize sera clonado.
+        description: "Pasta local onde o repositorio Kustomize sera clonado."
         required: false
         type: string
         default: kustomize-share
       ref:
-        description: Branch, tag ou SHA do repositorio Kustomize usado no deploy.
+        description: "Branch, tag ou SHA do repositorio Kustomize usado no deploy."
         required: false
         type: string
         default: main
