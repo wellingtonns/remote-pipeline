@@ -10,7 +10,7 @@ on:
 
 jobs:
   pipeline:
-    uses: ./.github/workflows/app-pipeline.yml
+    uses: wellingtonns/templates-pipeline/.github/workflows/app-pipeline.yml@main
     with:
       app_name: example-backend
       stack_type: backend

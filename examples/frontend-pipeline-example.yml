@@ -10,7 +10,7 @@ on:
 
 jobs:
   pipeline:
-    uses: ./.github/workflows/app-pipeline.yml
+    uses: wellingtonns/templates-pipeline/.github/workflows/app-pipeline.yml@main
     with:
       app_name: app-clinica
       stack_type: frontend

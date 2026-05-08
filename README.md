@@ -12,20 +12,22 @@ https://github.com/wellingtonns/kustomize-share
 
 ```text
 templates-pipeline/
-  workflows/
+  .github/
+    workflows/
     app-pipeline.yml
     build-frontend-nixpacks.yml
     build-backend-nixpacks.yml
     update-kustomize-image.yml
     deploy-kustomize.yml
+  examples/
     frontend-pipeline-example.yml
     backend-pipeline-example.yml
 ```
 
 ## Como usar
 
-1. Copie os arquivos de `templates-pipeline/workflows` para `.github/workflows` no repositorio que vai centralizar os templates.
-2. Em cada projeto, crie um workflow pequeno chamando `app-pipeline.yml`.
+1. Use os workflows reutilizaveis publicados em `wellingtonns/templates-pipeline/.github/workflows`.
+2. Em cada projeto, crie um workflow pequeno chamando `wellingtonns/templates-pipeline/.github/workflows/app-pipeline.yml@main`.
 3. Passe `stack_type: frontend` ou `stack_type: backend` para o template principal escolher o build correto.
 4. Passe `kustomize_repository` apontando para o repositorio separado de Kustomize.
 5. Apos o build e push da imagem, o template chama `update-kustomize-image.yml` para atualizar a tag no overlay Kustomize usando `newTag`.
@@ -43,7 +45,7 @@ on:
 
 jobs:
   pipeline:
-    uses: ./.github/workflows/app-pipeline.yml
+    uses: wellingtonns/templates-pipeline/.github/workflows/app-pipeline.yml@main
     with:
       app_name: app-clinica
       stack_type: frontend
