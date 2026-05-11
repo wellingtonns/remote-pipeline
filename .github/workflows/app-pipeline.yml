@@ -58,6 +58,31 @@ on:
         required: false
         type: string
         default: app-image
+      ensure_kustomize:
+        description: "Criar o overlay Kustomize se a pasta da aplicacao nao existir."
+        required: false
+        type: boolean
+        default: true
+      app_namespace:
+        description: "Namespace Kubernetes. Quando vazio, usa app_name."
+        required: false
+        type: string
+        default: ""
+      app_domain:
+        description: "Host do Ingress. Quando vazio, usa app_name.example.com."
+        required: false
+        type: string
+        default: ""
+      container_port:
+        description: "Porta HTTP do container. Quando vazio, usa 8080 para frontend e 3000 para backend."
+        required: false
+        type: string
+        default: ""
+      health_path:
+        description: "Path dos probes. Quando vazio, usa / para frontend e /health para backend."
+        required: false
+        type: string
+        default: ""
       update_kustomize:
         description: "Atualizar a tag da imagem no repositorio Kustomize."
         required: false
@@ -129,11 +154,34 @@ jobs:
       push: ${{ inputs.push }}
     secrets: inherit
 
+  ensure-kustomize:
+    name: Ensure Kustomize overlay
+    needs:
+      - build-frontend
+      - build-backend
+    if: ${{ inputs.ensure_kustomize && inputs.update_kustomize && always() && !failure() && !cancelled() }}
+    uses: ./.github/workflows/ensure-kustomize-app.yml
+    with:
+      app_name: ${{ inputs.app_name }}
+      stack_type: ${{ inputs.stack_type }}
+      kustomize_path: ${{ inputs.kustomize_path }}
+      kustomize_repository: ${{ inputs.kustomize_repository }}
+      kustomize_ref: ${{ inputs.kustomize_ref }}
+      kustomize_checkout_path: ${{ inputs.kustomize_checkout_path }}
+      image_name: ${{ inputs.image_name }}
+      image_alias: ${{ inputs.image_alias }}
+      app_namespace: ${{ inputs.app_namespace }}
+      app_domain: ${{ inputs.app_domain }}
+      container_port: ${{ inputs.container_port }}
+      health_path: ${{ inputs.health_path }}
+    secrets: inherit
+
   update-image:
     name: Update Kustomize image
     needs:
       - build-frontend
       - build-backend
+      - ensure-kustomize
     if: ${{ inputs.update_kustomize && always() && !failure() && !cancelled() }}
     uses: ./.github/workflows/update-kustomize-image.yml
     with:

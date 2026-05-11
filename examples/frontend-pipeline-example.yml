@@ -31,6 +31,9 @@ jobs:
       kustomize_repository: wellingtonns/kustomize-share
       kustomize_path: app/app-clinica
       image_alias: app-image
+      ensure_kustomize: true
+      app_namespace: app-clinica
+      app_domain: app-clinica.example.com
       update_kustomize: ${{ github.event_name == 'workflow_dispatch' && inputs.update_kustomize || github.event_name != 'workflow_dispatch' }}
       deploy: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy || github.event_name != 'workflow_dispatch' }}
       deploy_ref: main

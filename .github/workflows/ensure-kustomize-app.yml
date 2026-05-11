@@ -1,0 +1,240 @@
+name: Reusable Ensure Kustomize App
+
+on:
+  workflow_call:
+    inputs:
+      app_name:
+        description: "Nome logico da aplicacao."
+        required: true
+        type: string
+      stack_type:
+        description: "Tipo da stack. Valores aceitos: frontend ou backend."
+        required: true
+        type: string
+      kustomize_path:
+        description: "Caminho do overlay dentro do repositorio Kustomize. Exemplo app/app-clinica."
+        required: true
+        type: string
+      kustomize_repository:
+        description: "Repositorio que contem os manifests Kustomize. Exemplo wellingtonns/kustomize-share."
+        required: true
+        type: string
+      kustomize_ref:
+        description: "Branch do repositorio Kustomize."
+        required: false
+        type: string
+        default: main
+      kustomize_checkout_path:
+        description: "Pasta local onde o repositorio Kustomize sera clonado."
+        required: false
+        type: string
+        default: kustomize-share
+      image_name:
+        description: "Nome real da imagem que ficara em newName."
+        required: true
+        type: string
+      image_alias:
+        description: "Nome da imagem na base Kustomize."
+        required: false
+        type: string
+        default: app-image
+      app_namespace:
+        description: "Namespace Kubernetes. Quando vazio, usa app_name."
+        required: false
+        type: string
+        default: ""
+      app_domain:
+        description: "Host do Ingress. Quando vazio, usa app_name.example.com."
+        required: false
+        type: string
+        default: ""
+      container_port:
+        description: "Porta HTTP do container. Quando vazio, usa 8080 para frontend e 3000 para backend."
+        required: false
+        type: string
+        default: ""
+      health_path:
+        description: "Path dos probes. Quando vazio, usa / para frontend e /health para backend."
+        required: false
+        type: string
+        default: ""
+      git_user_name:
+        description: "Usuario Git para o commit."
+        required: false
+        type: string
+        default: "github-actions[bot]"
+      git_user_email:
+        description: "Email Git para o commit."
+        required: false
+        type: string
+        default: "41898282+github-actions[bot]@users.noreply.github.com"
+    secrets:
+      KUSTOMIZE_REPO_TOKEN:
+        required: true
+
+jobs:
+  ensure:
+    name: Ensure Kustomize overlay
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout Kustomize repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.kustomize_repository }}
+          ref: ${{ inputs.kustomize_ref }}
+          path: ${{ inputs.kustomize_checkout_path }}
+          token: ${{ secrets.KUSTOMIZE_REPO_TOKEN }}
+          persist-credentials: true
+
+      - name: Create overlay when missing
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APP_NAME="${{ inputs.app_name }}"
+          STACK_TYPE="${{ inputs.stack_type }}"
+          APP_DIR="${{ inputs.kustomize_checkout_path }}/${{ inputs.kustomize_path }}"
+          APP_NAMESPACE="${{ inputs.app_namespace }}"
+          APP_DOMAIN="${{ inputs.app_domain }}"
+          CONTAINER_PORT="${{ inputs.container_port }}"
+          HEALTH_PATH="${{ inputs.health_path }}"
+
+          if [ -z "$APP_NAMESPACE" ]; then
+            APP_NAMESPACE="$APP_NAME"
+          fi
+
+          if [ -z "$APP_DOMAIN" ]; then
+            APP_DOMAIN="$APP_NAME.example.com"
+          fi
+
+          if [ -z "$CONTAINER_PORT" ]; then
+            if [ "$STACK_TYPE" = "backend" ]; then
+              CONTAINER_PORT="3000"
+            else
+              CONTAINER_PORT="8080"
+            fi
+          fi
+
+          if [ -z "$HEALTH_PATH" ]; then
+            if [ "$STACK_TYPE" = "backend" ]; then
+              HEALTH_PATH="/health"
+            else
+              HEALTH_PATH="/"
+            fi
+          fi
+
+          if [ -d "$APP_DIR" ]; then
+            echo "Kustomize overlay already exists at $APP_DIR."
+            exit 0
+          fi
+
+          mkdir -p "$APP_DIR"
+
+          cat > "$APP_DIR/kustomization.yaml" <<EOF
+          apiVersion: kustomize.config.k8s.io/v1beta1
+          kind: Kustomization
+
+          namespace: $APP_NAMESPACE
+          namePrefix: $APP_NAME-
+
+          resources:
+            - namespace.yaml
+            - ../../base
+
+          images:
+            - name: ${{ inputs.image_alias }}
+              newName: ${{ inputs.image_name }}
+              newTag: latest
+
+          patches:
+            - path: deployment-patch.yaml
+            - path: ingress-patch.yaml
+
+          commonLabels:
+            app.kubernetes.io/part-of: $APP_NAME
+          EOF
+
+          cat > "$APP_DIR/namespace.yaml" <<EOF
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: $APP_NAMESPACE
+          EOF
+
+          cat > "$APP_DIR/deployment-patch.yaml" <<EOF
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: app
+          spec:
+            replicas: 2
+            template:
+              spec:
+                containers:
+                  - name: app
+                    ports:
+                      - name: http
+                        containerPort: $CONTAINER_PORT
+                    env:
+                      - name: NODE_ENV
+                        value: production
+                    readinessProbe:
+                      httpGet:
+                        path: $HEALTH_PATH
+                        port: http
+                      initialDelaySeconds: 10
+                      periodSeconds: 10
+                    livenessProbe:
+                      httpGet:
+                        path: $HEALTH_PATH
+                        port: http
+                      initialDelaySeconds: 30
+                      periodSeconds: 20
+                    resources:
+                      requests:
+                        cpu: 100m
+                        memory: 128Mi
+                      limits:
+                        cpu: 500m
+                        memory: 512Mi
+          EOF
+
+          cat > "$APP_DIR/ingress-patch.yaml" <<EOF
+          apiVersion: networking.k8s.io/v1
+          kind: Ingress
+          metadata:
+            name: app
+          spec:
+            rules:
+              - host: $APP_DOMAIN
+                http:
+                  paths:
+                    - path: /
+                      pathType: Prefix
+                      backend:
+                        service:
+                          name: app
+                          port:
+                            name: http
+          EOF
+
+      - name: Commit overlay when created
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "${{ inputs.git_user_name }}"
+          git config user.email "${{ inputs.git_user_email }}"
+          cd "${{ inputs.kustomize_checkout_path }}"
+
+          if git diff --quiet; then
+            echo "No Kustomize overlay changes to commit."
+            exit 0
+          fi
+
+          git add "${{ inputs.kustomize_path }}"
+          git commit -m "chore: add kustomize overlay for ${{ inputs.app_name }}"
+          git push
