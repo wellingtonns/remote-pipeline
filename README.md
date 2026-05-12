@@ -66,6 +66,7 @@ jobs:
     with:
       scan_path: .
       fail_on_leak: true
+      scan_history: false
       run_gitleaks: true
       run_trufflehog: true
 ```
@@ -74,6 +75,7 @@ Parametros principais:
 
 - `scan_path`: pasta analisada. Padrao: `.`.
 - `fail_on_leak`: falha o workflow quando encontra segredo. Padrao: `true`.
+- `scan_history`: quando `false`, analisa somente os arquivos atuais e a pipeline passa apos remover a secret. Quando `true`, analisa todo o historico Git para auditoria. Padrao: `false`.
 - `gitleaks_image`: imagem Docker usada pelo Gitleaks. Padrao: `ghcr.io/gitleaks/gitleaks:latest`.
 - `gitleaks_config_path`: caminho opcional para `.gitleaks.toml`, util para allowlist de falsos positivos.
 - `trufflehog_extra_args`: argumentos extras do TruffleHog. Padrao: `--only-verified`.
