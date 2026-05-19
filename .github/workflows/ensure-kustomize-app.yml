@@ -77,7 +77,7 @@ jobs:
       - name: Checkout manifests repository
         uses: actions/checkout@v6
         with:
-          token: ${{ secrets.PIPELINE_FACTORY_ACTION || secrets.KUSTOMIZE_REPO_TOKEN }}
+          token: ${{ secrets.PIPELINE_FACTORY_ACTION || secrets.KUSTOMIZE_REPO_TOKEN || github.token }}
           repository: ${{ inputs.kustomize_repository || 'wellingtonns/kustomize-share' }}
           ref: ${{ inputs.kustomize_ref || 'main' }}
           fetch-depth: 0
