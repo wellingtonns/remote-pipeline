@@ -176,23 +176,23 @@ jobs:
       health_path: ${{ inputs.health_path }}
     secrets: inherit
 
-  # update-image:
-  #   name: Update Kustomize image
-  #   needs:
-  #     - build-frontend
-  #     - build-backend
-  #     - validate-kustomize
-  #   if: ${{ inputs.update_kustomize && always() && !failure() && !cancelled() }}
-  #   uses: ./.github/workflows/update-kustomize-image.yml
-  #   with:
-  #     kustomize_path: ${{ inputs.kustomize_path }}
-  #     kustomize_repository: ${{ inputs.kustomize_repository }}
-  #     kustomize_ref: ${{ inputs.kustomize_ref }}
-  #     kustomize_checkout_path: ${{ inputs.kustomize_checkout_path }}
-  #     image_name: ${{ inputs.image_name }}
-  #     image_alias: ${{ inputs.image_alias }}
-  #     image_tag: ${{ needs.build-frontend.outputs.image_tag || needs.build-backend.outputs.image_tag }}
-  #   secrets: inherit
+  update-image:
+    name: Update Kustomize image
+    needs:
+      - build-frontend
+      - build-backend
+      - validate-kustomize
+    if: ${{ inputs.update_kustomize && always() && !failure() && !cancelled() }}
+    uses: ./.github/workflows/update-kustomize-image.yml
+    with:
+      kustomize_path: ${{ inputs.kustomize_path }}
+      kustomize_repository: ${{ inputs.kustomize_repository }}
+      kustomize_ref: ${{ inputs.kustomize_ref }}
+      kustomize_checkout_path: ${{ inputs.kustomize_checkout_path }}
+      image_name: ${{ inputs.image_name }}
+      image_alias: ${{ inputs.image_alias }}
+      image_tag: ${{ needs.build-frontend.outputs.image_tag || needs.build-backend.outputs.image_tag }}
+    secrets: inherit
 
   # deploy:
   #   name: Deploy
