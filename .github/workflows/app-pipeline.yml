@@ -154,13 +154,13 @@ jobs:
       push: ${{ inputs.push }}
     secrets: inherit
 
-  ensure-kustomize:
+  validate-kustomize:
     name: Ensure Kustomize overlay
     needs:
       - build-frontend
       - build-backend
     if: ${{ inputs.ensure_kustomize && inputs.update_kustomize && always() && !failure() && !cancelled() }}
-    uses: ./.github/workflows/ensure-kustomize-app.yml
+    uses: ./.github/workflows/validate-kustomize.yml
     with:
       app_name: ${{ inputs.app_name }}
       stack_type: ${{ inputs.stack_type }}
@@ -181,7 +181,7 @@ jobs:
     needs:
       - build-frontend
       - build-backend
-      - ensure-kustomize
+      - validate-kustomize
     if: ${{ inputs.update_kustomize && always() && !failure() && !cancelled() }}
     uses: ./.github/workflows/update-kustomize-image.yml
     with:
