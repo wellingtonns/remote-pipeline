@@ -74,7 +74,7 @@ jobs:
     if: github.ref_name == 'dev' || github.ref_name == 'main' || github.ref_name == 'master'
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
 
     steps:
       - name: Validate Kustomize write token
