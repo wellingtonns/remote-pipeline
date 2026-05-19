@@ -156,9 +156,7 @@ jobs:
 
   validate-kustomize:
     name: Ensure Kustomize overlay
-    needs:
-      - build-frontend
-      - build-backend
+    needs: validate
     if: ${{ inputs.ensure_kustomize && inputs.update_kustomize && always() && !failure() && !cancelled() }}
     uses: ./.github/workflows/validate-kustomize.yml
     with:
