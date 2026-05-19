@@ -107,6 +107,8 @@ on:
         required: false
       KUSTOMIZE_REPO_TOKEN:
         required: false
+      PIPELINE_FACTORY_ACTION:
+        required: false
 
 jobs:
   validate:
