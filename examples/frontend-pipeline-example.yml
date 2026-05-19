@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       update_kustomize:
-        description: "Atualizar newTag no repositorio kustomize-share."
+        description: "Atualizar newTag no repositorio workloads."
         required: false
         type: boolean
         default: false
@@ -28,7 +28,8 @@ jobs:
       stack_type: frontend
       context: app-clinica
       image_name: ghcr.io/${{ github.repository_owner }}/app-clinica
-      kustomize_repository: wellingtonns/kustomize-share
+      kustomize_repository: wellingtonns/workloads
+      kustomize_checkout_path: workloads
       kustomize_path: app/app-clinica
       image_alias: app-image
       ensure_kustomize: true

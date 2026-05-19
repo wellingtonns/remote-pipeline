@@ -5,7 +5,7 @@ Estrutura compartilhada para padronizar build, push, atualizacao de imagem e dep
 Os manifests Kustomize ficam em um repositorio separado:
 
 ```text
-https://github.com/wellingtonns/kustomize-share
+https://github.com/wellingtonns/workloads
 ```
 
 ## Estrutura
@@ -100,7 +100,8 @@ jobs:
       stack_type: frontend
       context: app-clinica
       image_name: ghcr.io/${{ github.repository_owner }}/app-clinica
-      kustomize_repository: wellingtonns/kustomize-share
+      kustomize_repository: wellingtonns/workloads
+      kustomize_checkout_path: workloads
       kustomize_path: app/app-clinica
       image_alias: app-image
       ensure_kustomize: true
@@ -121,11 +122,11 @@ Use secrets quando publicar em outro registry:
 
 Para atualizar o repositorio separado de Kustomize:
 
-- `KUSTOMIZE_REPO_TOKEN`: token com permissao de escrita no repositorio `kustomize-share`.
+- `KUSTOMIZE_REPO_TOKEN`: token com permissao de escrita no repositorio `workloads`.
 
 ## Criacao automatica do overlay Kustomize
 
-Quando `ensure_kustomize: true`, a pipeline verifica se o caminho informado em `kustomize_path` existe no repositorio `kustomize-share`.
+Quando `ensure_kustomize: true`, a pipeline verifica se o caminho informado em `kustomize_path` existe no repositorio `workloads`.
 
 Exemplo:
 
@@ -159,7 +160,7 @@ ghcr.io/OWNER/IMAGE_NAME:TAG
 
 ## Atualizacao com Kustomize
 
-Cada overlay no repositorio `kustomize-share`, em `app/<app>`, define a imagem assim:
+Cada overlay no repositorio `workloads`, em `app/<app>`, define a imagem assim:
 
 ```yaml
 images:

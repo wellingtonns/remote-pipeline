@@ -8,14 +8,14 @@ on:
         required: true
         type: string
       kustomize_repository:
-        description: "Repositorio que contem os manifests Kustomize. Exemplo wellingtonns/kustomize-share."
+        description: "Repositorio que contem os manifests Kustomize. Exemplo wellingtonns/workloads."
         required: true
         type: string
       kustomize_checkout_path:
         description: "Pasta local onde o repositorio Kustomize sera clonado."
         required: false
         type: string
-        default: kustomize-share
+        default: workloads
       ref:
         description: "Branch, tag ou SHA do repositorio Kustomize usado no deploy."
         required: false

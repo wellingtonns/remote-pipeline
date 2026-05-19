@@ -52,7 +52,7 @@ on:
         description: "Pasta local onde o repositorio Kustomize sera clonado."
         required: false
         type: string
-        default: kustomize-share
+        default: workloads
       image_alias:
         description: "Nome da imagem na base Kustomize."
         required: false
