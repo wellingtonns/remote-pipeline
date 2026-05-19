@@ -182,7 +182,13 @@ jobs:
       - build-frontend
       - build-backend
       - validate-kustomize
-    if: ${{ inputs.update_kustomize && always() && !failure() && !cancelled() }}
+    if: >-
+      ${{
+        inputs.update_kustomize &&
+        always() &&
+        needs.validate-kustomize.result == 'success' &&
+        (needs.build-frontend.result == 'success' || needs.build-backend.result == 'success')
+      }}
     uses: ./.github/workflows/update-kustomize-image.yml
     with:
       kustomize_path: ${{ inputs.kustomize_path }}
