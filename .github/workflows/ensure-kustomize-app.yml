@@ -78,7 +78,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           token: ${{ secrets.PIPELINE_FACTORY_ACTION || secrets.KUSTOMIZE_REPO_TOKEN }}
-          repository: ${{ inputs.kustomize_repository || 'Collegia-Partners/workloads' }}
+          repository: ${{ inputs.kustomize_repository || 'wellingtonns/kustomize-share' }}
           ref: ${{ inputs.kustomize_ref || 'main' }}
           fetch-depth: 0
 
