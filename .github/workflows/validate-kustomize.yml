@@ -82,9 +82,10 @@ jobs:
         env:
           CURRENT_REPOSITORY: ${{ github.repository }}
           TARGET_REPOSITORY: ${{ inputs.kustomize_repository }}
-          HAS_KUSTOMIZE_TOKEN: ${{ secrets.KUSTOMIZE_REPO_TOKEN != '' || secrets.PIPELINE_FACTORY_ACTION != '' }}
+          KUSTOMIZE_REPO_TOKEN: ${{ secrets.KUSTOMIZE_REPO_TOKEN }}
+          PIPELINE_FACTORY_ACTION: ${{ secrets.PIPELINE_FACTORY_ACTION }}
         run: |
-          if [[ "$CURRENT_REPOSITORY" != "$TARGET_REPOSITORY" && "$HAS_KUSTOMIZE_TOKEN" != "true" ]]; then
+          if [[ "$CURRENT_REPOSITORY" != "$TARGET_REPOSITORY" && -z "$KUSTOMIZE_REPO_TOKEN" && -z "$PIPELINE_FACTORY_ACTION" ]]; then
             echo "Missing KUSTOMIZE_REPO_TOKEN or PIPELINE_FACTORY_ACTION."
             echo "The workflow is running from $CURRENT_REPOSITORY, but needs to push changes to $TARGET_REPOSITORY."
             echo "Create one of these secrets with Contents: Read and write access to $TARGET_REPOSITORY."
