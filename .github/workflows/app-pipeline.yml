@@ -126,33 +126,33 @@ jobs:
               ;;
           esac
 
-  build-frontend:
-    name: Build frontend
-    needs: validate
-    if: ${{ inputs.stack_type == 'frontend' }}
-    uses: ./.github/workflows/build-frontend-nixpacks.yml
-    with:
-      app_name: ${{ inputs.app_name }}
-      context: ${{ inputs.context }}
-      image_name: ${{ inputs.image_name }}
-      registry: ${{ inputs.registry }}
-      image_tag: ${{ inputs.image_tag }}
-      push: ${{ inputs.push }}
-    secrets: inherit
+  # build-frontend:
+  #   name: Build frontend
+  #   needs: validate
+  #   if: ${{ inputs.stack_type == 'frontend' }}
+  #   uses: ./.github/workflows/build-frontend-nixpacks.yml
+  #   with:
+  #     app_name: ${{ inputs.app_name }}
+  #     context: ${{ inputs.context }}
+  #     image_name: ${{ inputs.image_name }}
+  #     registry: ${{ inputs.registry }}
+  #     image_tag: ${{ inputs.image_tag }}
+  #     push: ${{ inputs.push }}
+  #   secrets: inherit
 
-  build-backend:
-    name: Build backend
-    needs: validate
-    if: ${{ inputs.stack_type == 'backend' }}
-    uses: ./.github/workflows/build-backend-nixpacks.yml
-    with:
-      app_name: ${{ inputs.app_name }}
-      context: ${{ inputs.context }}
-      image_name: ${{ inputs.image_name }}
-      registry: ${{ inputs.registry }}
-      image_tag: ${{ inputs.image_tag }}
-      push: ${{ inputs.push }}
-    secrets: inherit
+  # build-backend:
+  #   name: Build backend
+  #   needs: validate
+  #   if: ${{ inputs.stack_type == 'backend' }}
+  #   uses: ./.github/workflows/build-backend-nixpacks.yml
+  #   with:
+  #     app_name: ${{ inputs.app_name }}
+  #     context: ${{ inputs.context }}
+  #     image_name: ${{ inputs.image_name }}
+  #     registry: ${{ inputs.registry }}
+  #     image_tag: ${{ inputs.image_tag }}
+  #     push: ${{ inputs.push }}
+  #   secrets: inherit
 
   validate-kustomize:
     name: Ensure Kustomize overlay
@@ -174,32 +174,32 @@ jobs:
       health_path: ${{ inputs.health_path }}
     secrets: inherit
 
-  update-image:
-    name: Update Kustomize image
-    needs:
-      - build-frontend
-      - build-backend
-      - validate-kustomize
-    if: ${{ inputs.update_kustomize && always() && !failure() && !cancelled() }}
-    uses: ./.github/workflows/update-kustomize-image.yml
-    with:
-      kustomize_path: ${{ inputs.kustomize_path }}
-      kustomize_repository: ${{ inputs.kustomize_repository }}
-      kustomize_ref: ${{ inputs.kustomize_ref }}
-      kustomize_checkout_path: ${{ inputs.kustomize_checkout_path }}
-      image_name: ${{ inputs.image_name }}
-      image_alias: ${{ inputs.image_alias }}
-      image_tag: ${{ needs.build-frontend.outputs.image_tag || needs.build-backend.outputs.image_tag }}
-    secrets: inherit
+  # update-image:
+  #   name: Update Kustomize image
+  #   needs:
+  #     - build-frontend
+  #     - build-backend
+  #     - validate-kustomize
+  #   if: ${{ inputs.update_kustomize && always() && !failure() && !cancelled() }}
+  #   uses: ./.github/workflows/update-kustomize-image.yml
+  #   with:
+  #     kustomize_path: ${{ inputs.kustomize_path }}
+  #     kustomize_repository: ${{ inputs.kustomize_repository }}
+  #     kustomize_ref: ${{ inputs.kustomize_ref }}
+  #     kustomize_checkout_path: ${{ inputs.kustomize_checkout_path }}
+  #     image_name: ${{ inputs.image_name }}
+  #     image_alias: ${{ inputs.image_alias }}
+  #     image_tag: ${{ needs.build-frontend.outputs.image_tag || needs.build-backend.outputs.image_tag }}
+  #   secrets: inherit
 
-  deploy:
-    name: Deploy
-    needs: update-image
-    if: ${{ inputs.deploy && always() && !failure() && !cancelled() }}
-    uses: ./.github/workflows/deploy-kustomize.yml
-    with:
-      kustomize_path: ${{ inputs.kustomize_path }}
-      kustomize_repository: ${{ inputs.kustomize_repository }}
-      kustomize_checkout_path: ${{ inputs.kustomize_checkout_path }}
-      ref: ${{ inputs.deploy_ref }}
-    secrets: inherit
+  # deploy:
+  #   name: Deploy
+  #   needs: update-image
+  #   if: ${{ inputs.deploy && always() && !failure() && !cancelled() }}
+  #   uses: ./.github/workflows/deploy-kustomize.yml
+  #   with:
+  #     kustomize_path: ${{ inputs.kustomize_path }}
+  #     kustomize_repository: ${{ inputs.kustomize_repository }}
+  #     kustomize_checkout_path: ${{ inputs.kustomize_checkout_path }}
+  #     ref: ${{ inputs.deploy_ref }}
+  #   secrets: inherit
