@@ -150,4 +150,4 @@ jobs:
 
           git add "${{ steps.kustomize.outputs.relative_path }}/kustomization.yaml"
           git commit -m "${{ inputs.commit_message }}: ${{ inputs.image_tag }}"
-          git push
+          git push origin "HEAD:${{ inputs.kustomize_ref }}"
