@@ -128,33 +128,33 @@ jobs:
               ;;
           esac
 
-  # build-frontend:
-  #   name: Build frontend
-  #   needs: validate
-  #   if: ${{ inputs.stack_type == 'frontend' }}
-  #   uses: ./.github/workflows/build-frontend-nixpacks.yml
-  #   with:
-  #     app_name: ${{ inputs.app_name }}
-  #     context: ${{ inputs.context }}
-  #     image_name: ${{ inputs.image_name }}
-  #     registry: ${{ inputs.registry }}
-  #     image_tag: ${{ inputs.image_tag }}
-  #     push: ${{ inputs.push }}
-  #   secrets: inherit
+  build-frontend:
+    name: Build frontend
+    needs: validate
+    if: ${{ inputs.stack_type == 'frontend' }}
+    uses: ./.github/workflows/build-frontend-nixpacks.yml
+    with:
+      app_name: ${{ inputs.app_name }}
+      context: ${{ inputs.context }}
+      image_name: ${{ inputs.image_name }}
+      registry: ${{ inputs.registry }}
+      image_tag: ${{ inputs.image_tag }}
+      push: ${{ inputs.push }}
+    secrets: inherit
 
-  # build-backend:
-  #   name: Build backend
-  #   needs: validate
-  #   if: ${{ inputs.stack_type == 'backend' }}
-  #   uses: ./.github/workflows/build-backend-nixpacks.yml
-  #   with:
-  #     app_name: ${{ inputs.app_name }}
-  #     context: ${{ inputs.context }}
-  #     image_name: ${{ inputs.image_name }}
-  #     registry: ${{ inputs.registry }}
-  #     image_tag: ${{ inputs.image_tag }}
-  #     push: ${{ inputs.push }}
-  #   secrets: inherit
+  build-backend:
+    name: Build backend
+    needs: validate
+    if: ${{ inputs.stack_type == 'backend' }}
+    uses: ./.github/workflows/build-backend-nixpacks.yml
+    with:
+      app_name: ${{ inputs.app_name }}
+      context: ${{ inputs.context }}
+      image_name: ${{ inputs.image_name }}
+      registry: ${{ inputs.registry }}
+      image_tag: ${{ inputs.image_tag }}
+      push: ${{ inputs.push }}
+    secrets: inherit
 
   validate-kustomize:
     name: Ensure Kustomize overlay
