@@ -73,10 +73,44 @@ jobs:
       - name: Setup Kustomize
         uses: imranismail/setup-kustomize@v2
 
-      - name: Update image tag with Kustomize
-        working-directory: ${{ inputs.kustomize_checkout_path }}/${{ inputs.kustomize_path }}
+      - name: Resolve Kustomize path
+        id: kustomize
         shell: bash
         run: |
+          set -euo pipefail
+
+          BASE_PATH="${{ inputs.kustomize_checkout_path }}/${{ inputs.kustomize_path }}"
+
+          if [[ -f "$BASE_PATH/kustomization.yaml" || -f "$BASE_PATH/kustomization.yml" ]]; then
+            echo "path=$BASE_PATH" >> "$GITHUB_OUTPUT"
+            echo "relative_path=${{ inputs.kustomize_path }}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ "${{ github.ref_name }}" == "dev" ]]; then
+            OVERLAY_NAME="dev"
+          elif [[ "${{ github.ref_name }}" == "main" || "${{ github.ref_name }}" == "master" ]]; then
+            OVERLAY_NAME="prd"
+          else
+            echo "Branch not supported for overlay selection: ${{ github.ref_name }}"
+            exit 1
+          fi
+
+          OVERLAY_PATH="$BASE_PATH/overlays/$OVERLAY_NAME"
+          if [[ ! -f "$OVERLAY_PATH/kustomization.yaml" && ! -f "$OVERLAY_PATH/kustomization.yml" ]]; then
+            echo "Kustomization file not found in $OVERLAY_PATH"
+            exit 1
+          fi
+
+          echo "path=$OVERLAY_PATH" >> "$GITHUB_OUTPUT"
+          echo "relative_path=${{ inputs.kustomize_path }}/overlays/$OVERLAY_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Update image tag with Kustomize
+        working-directory: ${{ steps.kustomize.outputs.path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
           IMAGE_ALIAS="${{ inputs.image_alias }}"
           if [ -z "$IMAGE_ALIAS" ]; then
             IMAGE_ALIAS="${{ inputs.image_name }}"
@@ -97,6 +131,6 @@ jobs:
             exit 0
           fi
 
-          git add "${{ inputs.kustomize_path }}/kustomization.yaml"
+          git add "${{ steps.kustomize.outputs.relative_path }}/kustomization.yaml"
           git commit -m "${{ inputs.commit_message }}: ${{ inputs.image_tag }}"
           git push

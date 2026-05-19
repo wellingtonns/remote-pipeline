@@ -53,6 +53,36 @@ jobs:
           echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > "$HOME/.kube/config"
           chmod 600 "$HOME/.kube/config"
 
+      - name: Resolve Kustomize path
+        id: kustomize
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BASE_PATH="${{ inputs.kustomize_checkout_path }}/${{ inputs.kustomize_path }}"
+
+          if [[ -f "$BASE_PATH/kustomization.yaml" || -f "$BASE_PATH/kustomization.yml" ]]; then
+            echo "path=$BASE_PATH" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ "${{ github.ref_name }}" == "dev" ]]; then
+            OVERLAY_NAME="dev"
+          elif [[ "${{ github.ref_name }}" == "main" || "${{ github.ref_name }}" == "master" ]]; then
+            OVERLAY_NAME="prd"
+          else
+            echo "Branch not supported for overlay selection: ${{ github.ref_name }}"
+            exit 1
+          fi
+
+          OVERLAY_PATH="$BASE_PATH/overlays/$OVERLAY_NAME"
+          if [[ ! -f "$OVERLAY_PATH/kustomization.yaml" && ! -f "$OVERLAY_PATH/kustomization.yml" ]]; then
+            echo "Kustomization file not found in $OVERLAY_PATH"
+            exit 1
+          fi
+
+          echo "path=$OVERLAY_PATH" >> "$GITHUB_OUTPUT"
+
       - name: Apply Kustomize overlay
         shell: bash
-        run: kubectl apply -k "${{ inputs.kustomize_checkout_path }}/${{ inputs.kustomize_path }}"
+        run: kubectl apply -k "${{ steps.kustomize.outputs.path }}"
