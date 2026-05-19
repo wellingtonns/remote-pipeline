@@ -62,7 +62,7 @@ on:
         description: "Pasta modelo dentro do repositorio Kustomize."
         required: false
         type: string
-        default: workoload-template
+        default: workload-template
     secrets:
       KUSTOMIZE_REPO_TOKEN:
         required: false

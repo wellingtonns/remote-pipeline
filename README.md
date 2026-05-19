@@ -125,7 +125,7 @@ Para atualizar o repositorio separado de Kustomize:
 
 ## Criacao automatica do overlay Kustomize
 
-Quando `ensure_kustomize: true` e `update_kustomize: true`, a pipeline verifica se o caminho informado em `kustomize_path` existe no repositorio `kustomize-share`.
+Quando `ensure_kustomize: true`, a pipeline verifica se o caminho informado em `kustomize_path` existe no repositorio `kustomize-share`.
 
 Exemplo:
 
