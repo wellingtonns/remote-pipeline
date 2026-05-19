@@ -139,9 +139,12 @@ jobs:
       - name: Commit and push changes
         shell: bash
         run: |
+          set -euo pipefail
+
+          cd "${{ inputs.kustomize_checkout_path }}"
+
           git config user.name "${{ inputs.git_user_name }}"
           git config user.email "${{ inputs.git_user_email }}"
-          cd "${{ inputs.kustomize_checkout_path }}"
 
           if git diff --quiet; then
             echo "No Kustomize changes to commit."
