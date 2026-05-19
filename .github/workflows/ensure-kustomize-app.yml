@@ -1,240 +1,140 @@
-name: Reusable Ensure Kustomize App
+name: Validate Kustomize
 
 on:
   workflow_call:
     inputs:
+      ENVIRONMENT:
+        required: false
+        type: string
+        default: ""
+      KUBERNETES_MANIFESTS_PATH:
+        required: false
+        type: string
+        default: "./iac/kubernetes"
       app_name:
-        description: "Nome logico da aplicacao."
-        required: true
+        required: false
         type: string
+        default: ""
       stack_type:
-        description: "Tipo da stack. Valores aceitos: frontend ou backend."
-        required: true
+        required: false
         type: string
+        default: ""
       kustomize_path:
-        description: "Caminho do overlay dentro do repositorio Kustomize. Exemplo app/app-clinica."
-        required: true
+        required: false
         type: string
+        default: ""
       kustomize_repository:
-        description: "Repositorio que contem os manifests Kustomize. Exemplo wellingtonns/kustomize-share."
-        required: true
+        required: false
         type: string
+        default: ""
       kustomize_ref:
-        description: "Branch do repositorio Kustomize."
         required: false
         type: string
-        default: main
+        default: ""
       kustomize_checkout_path:
-        description: "Pasta local onde o repositorio Kustomize sera clonado."
         required: false
         type: string
-        default: kustomize-share
+        default: ""
       image_name:
-        description: "Nome real da imagem que ficara em newName."
-        required: true
-        type: string
-      image_alias:
-        description: "Nome da imagem na base Kustomize."
         required: false
         type: string
-        default: app-image
+        default: ""
+      image_alias:
+        required: false
+        type: string
+        default: ""
       app_namespace:
-        description: "Namespace Kubernetes. Quando vazio, usa app_name."
         required: false
         type: string
         default: ""
       app_domain:
-        description: "Host do Ingress. Quando vazio, usa app_name.example.com."
         required: false
         type: string
         default: ""
       container_port:
-        description: "Porta HTTP do container. Quando vazio, usa 8080 para frontend e 3000 para backend."
         required: false
         type: string
         default: ""
       health_path:
-        description: "Path dos probes. Quando vazio, usa / para frontend e /health para backend."
         required: false
         type: string
         default: ""
-      git_user_name:
-        description: "Usuario Git para o commit."
-        required: false
-        type: string
-        default: "github-actions[bot]"
-      git_user_email:
-        description: "Email Git para o commit."
-        required: false
-        type: string
-        default: "41898282+github-actions[bot]@users.noreply.github.com"
-    secrets:
-      KUSTOMIZE_REPO_TOKEN:
-        required: true
+
+permissions:
+  contents: write
 
 jobs:
-  ensure:
-    name: Ensure Kustomize overlay
+  validate-structure:
+    if: github.ref_name == 'dev' || github.ref_name == 'main'
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
 
     steps:
-      - name: Checkout Kustomize repository
-        uses: actions/checkout@v4
+      - name: Checkout manifests repository
+        uses: actions/checkout@v6
         with:
-          repository: ${{ inputs.kustomize_repository }}
-          ref: ${{ inputs.kustomize_ref }}
-          path: ${{ inputs.kustomize_checkout_path }}
-          token: ${{ secrets.KUSTOMIZE_REPO_TOKEN }}
-          persist-credentials: true
+          token: ${{ secrets.PIPELINE_FACTORY_ACTION }}
+          repository: Collegia-Partners/workloads
+          ref: main
+          fetch-depth: 0
 
-      - name: Create overlay when missing
+      - name: Ensure app structure from iac-model
+        id: structure
         shell: bash
         run: |
           set -euo pipefail
 
-          APP_NAME="${{ inputs.app_name }}"
-          STACK_TYPE="${{ inputs.stack_type }}"
-          APP_DIR="${{ inputs.kustomize_checkout_path }}/${{ inputs.kustomize_path }}"
-          APP_NAMESPACE="${{ inputs.app_namespace }}"
-          APP_DOMAIN="${{ inputs.app_domain }}"
-          CONTAINER_PORT="${{ inputs.container_port }}"
-          HEALTH_PATH="${{ inputs.health_path }}"
+          REPO_NAME="${{ github.event.repository.name }}"
+          APP_NAME="$REPO_NAME"
 
-          if [ -z "$APP_NAMESPACE" ]; then
-            APP_NAMESPACE="$APP_NAME"
+          APP_NAME="${APP_NAME%-dev}"
+          APP_NAME="${APP_NAME%-prd}"
+          APP_NAME="$(echo "$APP_NAME" | tr '[:upper:]' '[:lower:]')"
+
+          TEMPLATE_DIR="iac-model"
+          TARGET_DIR="apps/${APP_NAME}"
+
+          if [[ ! -d "$TEMPLATE_DIR" ]]; then
+            echo "Template directory not found: $TEMPLATE_DIR"
+            exit 1
           fi
 
-          if [ -z "$APP_DOMAIN" ]; then
-            APP_DOMAIN="$APP_NAME.example.com"
-          fi
-
-          if [ -z "$CONTAINER_PORT" ]; then
-            if [ "$STACK_TYPE" = "backend" ]; then
-              CONTAINER_PORT="3000"
-            else
-              CONTAINER_PORT="8080"
-            fi
-          fi
-
-          if [ -z "$HEALTH_PATH" ]; then
-            if [ "$STACK_TYPE" = "backend" ]; then
-              HEALTH_PATH="/health"
-            else
-              HEALTH_PATH="/"
-            fi
-          fi
-
-          if [ -d "$APP_DIR" ]; then
-            echo "Kustomize overlay already exists at $APP_DIR."
+          if [[ -d "$TARGET_DIR" ]]; then
+            echo "App directory already exists: $TARGET_DIR"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "app_name=$APP_NAME" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          mkdir -p "$APP_DIR"
+          mkdir -p "apps"
+          cp -R "$TEMPLATE_DIR" "$TARGET_DIR"
+          find "$TARGET_DIR" -type f -exec sed -i "s/{{APP_NAME}}/$APP_NAME/g" {} +
 
-          cat > "$APP_DIR/kustomization.yaml" <<EOF
-          apiVersion: kustomize.config.k8s.io/v1beta1
-          kind: Kustomization
+          echo "Created app structure at: $TARGET_DIR"
+          echo "app_name=$APP_NAME" >> "$GITHUB_OUTPUT"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
 
-          namespace: $APP_NAMESPACE
-          namePrefix: $APP_NAME-
+      - name: Show resulting structure
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP_NAME="${{ steps.structure.outputs.app_name }}"
+          find "apps/${APP_NAME}" -type f | sort
 
-          resources:
-            - namespace.yaml
-            - ../../base
-
-          images:
-            - name: ${{ inputs.image_alias }}
-              newName: ${{ inputs.image_name }}
-              newTag: latest
-
-          patches:
-            - path: deployment-patch.yaml
-            - path: ingress-patch.yaml
-
-          commonLabels:
-            app.kubernetes.io/part-of: $APP_NAME
-          EOF
-
-          cat > "$APP_DIR/namespace.yaml" <<EOF
-          apiVersion: v1
-          kind: Namespace
-          metadata:
-            name: $APP_NAMESPACE
-          EOF
-
-          cat > "$APP_DIR/deployment-patch.yaml" <<EOF
-          apiVersion: apps/v1
-          kind: Deployment
-          metadata:
-            name: app
-          spec:
-            replicas: 2
-            template:
-              spec:
-                containers:
-                  - name: app
-                    ports:
-                      - name: http
-                        containerPort: $CONTAINER_PORT
-                    env:
-                      - name: NODE_ENV
-                        value: production
-                    readinessProbe:
-                      httpGet:
-                        path: $HEALTH_PATH
-                        port: http
-                      initialDelaySeconds: 10
-                      periodSeconds: 10
-                    livenessProbe:
-                      httpGet:
-                        path: $HEALTH_PATH
-                        port: http
-                      initialDelaySeconds: 30
-                      periodSeconds: 20
-                    resources:
-                      requests:
-                        cpu: 100m
-                        memory: 128Mi
-                      limits:
-                        cpu: 500m
-                        memory: 512Mi
-          EOF
-
-          cat > "$APP_DIR/ingress-patch.yaml" <<EOF
-          apiVersion: networking.k8s.io/v1
-          kind: Ingress
-          metadata:
-            name: app
-          spec:
-            rules:
-              - host: $APP_DOMAIN
-                http:
-                  paths:
-                    - path: /
-                      pathType: Prefix
-                      backend:
-                        service:
-                          name: app
-                          port:
-                            name: http
-          EOF
-
-      - name: Commit overlay when created
+      - name: Commit changes
+        if: steps.structure.outputs.changed == 'true'
         shell: bash
         run: |
           set -euo pipefail
 
-          git config user.name "${{ inputs.git_user_name }}"
-          git config user.email "${{ inputs.git_user_email }}"
-          cd "${{ inputs.kustomize_checkout_path }}"
+          git config user.name "collegia-bot"
+          git config user.email "devops@collegia.co.uk"
 
-          if git diff --quiet; then
-            echo "No Kustomize overlay changes to commit."
+          git add "apps/${{ steps.structure.outputs.app_name }}"
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
             exit 0
           fi
 
-          git add "${{ inputs.kustomize_path }}"
-          git commit -m "chore: add kustomize overlay for ${{ inputs.app_name }}"
-          git push
+          git commit -m "chore(kustomize): bootstrap app from iac-model for ${{ steps.structure.outputs.app_name }}"
+          git push origin "HEAD:main"
