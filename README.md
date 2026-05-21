@@ -1,4 +1,4 @@
-# Templates de pipeline
+# Remote Pipeline
 
 Estrutura compartilhada para padronizar build, push, atualizacao de imagem e deploy Kubernetes para projetos frontend e backend.
 
