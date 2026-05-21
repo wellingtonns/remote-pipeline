@@ -28,7 +28,7 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Ensure app structure from iac-model
+      - name: Ensure app structure from worload-template
         id: structure
         shell: bash
         run: |
@@ -42,7 +42,7 @@ jobs:
           APP_NAME="${APP_NAME%-prd}"
           APP_NAME="$(echo "$APP_NAME" | tr '[:upper:]' '[:lower:]')"
 
-          TEMPLATE_DIR="iac-model"
+          TEMPLATE_DIR="worload-template"
           TARGET_DIR="apps/${APP_NAME}"
 
           if [[ "$BRANCH_NAME" == "dev" ]]; then
