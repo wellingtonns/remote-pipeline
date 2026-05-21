@@ -153,12 +153,12 @@ jobs:
     secrets: inherit
 
 
-  deploy-07-sync:
-    name: "DEPLOY | ArgoCD Sync"
-    if: ${{ always() && (github.ref_name == 'dev' || github.ref_name == 'main') && needs.deploy-06-tag.result == 'success' }}
-    needs: [deploy-06-tag, prep-03-resolve]
-    uses: wellingtonns/remote-pipeline/.github/workflows/deploy-argocd.yaml@devops
-    with:
-      APPLICATION: ${{ needs.prep-03-resolve.outputs.repo_name }}
-      ENVIRONMENT: ${{ needs.prep-03-resolve.outputs.environment }}
-    secrets: inherit
+  # deploy-07-sync:
+  #   name: "DEPLOY | ArgoCD Sync"
+  #   if: ${{ always() && (github.ref_name == 'dev' || github.ref_name == 'main') && needs.deploy-06-tag.result == 'success' }}
+  #   needs: [deploy-06-tag, prep-03-resolve]
+  #   uses: wellingtonns/remote-pipeline/.github/workflows/deploy-argocd.yaml@devops
+  #   with:
+  #     APPLICATION: ${{ needs.prep-03-resolve.outputs.repo_name }}
+  #     ENVIRONMENT: ${{ needs.prep-03-resolve.outputs.environment }}
+  #   secrets: inherit
