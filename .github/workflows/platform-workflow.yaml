@@ -1,0 +1,164 @@
+name: Platform CI
+on:
+  workflow_call:
+    inputs:
+      STACK_TYPE:
+        required: true
+        type: string
+      REPO_NAME:
+        required: false
+        type: string
+        default: ""
+      CONTEXT_DIR:
+        required: false
+        type: string
+        default: ./
+      KUBERNETES_MANAGER:
+        required: false
+        type: string
+        default: kustomize
+      KUBERNETES_MANIFESTS_PATH:
+        required: false
+        type: string
+        default: ./iac/kubernetes
+      NODE_VERSION:
+        required: false
+        type: string
+        default: "20"
+      NIXPACKS_BUILD_CMD:
+        required: false
+        type: string
+        default: ""
+      NIXPACKS_START_CMD:
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  # prep-01-branch-check:
+  #   name: "PREP | Branch Check"
+  #   uses: wellingtonns/remote-pipeline/.github/workflows/branch-check.yaml@devops
+
+  prep-02-stack-check:
+    name: "PREP | Stack Check"
+    runs-on: ubuntu-latest
+    # needs: [prep-01-branch-check]
+    steps:
+      - name: Validate stack type
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${{ inputs.STACK_TYPE }}" in
+            front)
+              echo "Stack type '${{ inputs.STACK_TYPE }}' is supported as legacy alias."
+              ;;
+
+            next|react|back|backend|api|go|python)
+              echo "Stack type '${{ inputs.STACK_TYPE }}' is supported."
+              ;;
+
+            *)
+              echo "Unsupported STACK_TYPE: '${{ inputs.STACK_TYPE }}'. Supported values: front, next, react, back, backend, go, python, api"
+              exit 1
+              ;;
+          esac
+
+  prep-03-resolve:
+    name: "PREP | Resolve Context"
+    runs-on: ubuntu-latest
+    needs: [prep-02-stack-check]
+    outputs:
+      repo_name: ${{ steps.repo.outputs.repo_name }}
+      environment: ${{ steps.env.outputs.environment }}
+    steps:
+      - name: Resolve base repo name
+        id: repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          REPO_NAME_INPUT="${{ inputs.REPO_NAME }}"
+          REPO_NAME_FALLBACK="${{ github.event.repository.name }}"
+          BASE_NAME="${REPO_NAME_INPUT:-$REPO_NAME_FALLBACK}"
+
+          # Keep a base identifier; deploy template appends env.
+          BASE_NAME="${BASE_NAME%-dev}"
+          BASE_NAME="${BASE_NAME%-prd}"
+          BASE_NAME="$(echo "${BASE_NAME}" | tr '[:upper:]' '[:lower:]')"
+
+          echo "repo_name=${BASE_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve environment
+        id: env
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF_NAME}" == "main" ]]; then
+            echo "environment=prd" >> "$GITHUB_OUTPUT"
+          elif [[ "${GITHUB_REF_NAME}" == "dev" ]]; then
+            echo "environment=dev" >> "$GITHUB_OUTPUT"
+          else
+            echo "environment=none" >> "$GITHUB_OUTPUT"
+          fi
+
+  prep-04-kustomize:
+    name: "PREP | Validate Kustomize"
+    if: ${{ github.ref_name == 'dev' || github.ref_name == 'main' }}
+    needs: [prep-03-resolve]
+    uses: wellingtonns/remote-pipeline/.github/workflows/validate-kustomize.yaml@devops
+    with:
+      ENVIRONMENT: ${{ needs.prep-03-resolve.outputs.environment }}
+      KUBERNETES_MANIFESTS_PATH: ${{ inputs.KUBERNETES_MANIFESTS_PATH }}
+    secrets: inherit
+
+  build-05-front:
+    name: "BUILD | Front Image"
+    if: ${{ inputs.STACK_TYPE == 'front' || inputs.STACK_TYPE == 'next' || inputs.STACK_TYPE == 'react' }}
+    needs: [prep-03-resolve]
+    uses: wellingtonns/remote-pipeline/.github/workflows/front-build.yaml@devops
+    with:
+      STACK_TYPE: ${{ inputs.STACK_TYPE }}
+      APPLICATION: ${{ needs.prep-03-resolve.outputs.repo_name }}
+      IMAGE_REPOSITORY: ${{ github.repository }}
+      ENVIRONMENT: ${{ needs.prep-03-resolve.outputs.environment }}
+      CONTEXT_DIR: ${{ inputs.CONTEXT_DIR }}
+      NODE_VERSION: ${{ inputs.NODE_VERSION }}
+      NIXPACKS_BUILD_CMD: ${{ inputs.NIXPACKS_BUILD_CMD }}
+      NIXPACKS_START_CMD: ${{ inputs.NIXPACKS_START_CMD }}
+    secrets: inherit
+
+  build-05-back:
+    name: "BUILD | Back Image"
+    if: ${{ inputs.STACK_TYPE == 'back' || inputs.STACK_TYPE == 'backend' || inputs.STACK_TYPE == 'api' || inputs.STACK_TYPE == 'go' || inputs.STACK_TYPE == 'python' }}
+    needs: [prep-03-resolve]
+    uses: wellingtonns/remote-pipeline/.github/workflows/back-build.yaml@devops
+    with:
+      STACK_TYPE: ${{ inputs.STACK_TYPE }}
+      APPLICATION: ${{ needs.prep-03-resolve.outputs.repo_name }}
+      IMAGE_REPOSITORY: ${{ github.repository }}
+      ENVIRONMENT: ${{ needs.prep-03-resolve.outputs.environment }}
+      CONTEXT_DIR: ${{ inputs.CONTEXT_DIR }}
+      NIXPACKS_BUILD_CMD: ${{ inputs.NIXPACKS_BUILD_CMD }}
+      NIXPACKS_START_CMD: ${{ inputs.NIXPACKS_START_CMD }}
+    secrets: inherit
+    
+  deploy-06-tag:
+    name: "DEPLOY | Update Workloads Tag"
+    if: ${{ always() && (github.ref_name == 'dev' || github.ref_name == 'main') && ((needs.build-05-front.result == 'success' && (inputs.STACK_TYPE == 'front' || inputs.STACK_TYPE == 'next' || inputs.STACK_TYPE == 'react')) || (needs.build-05-back.result == 'success' && (inputs.STACK_TYPE == 'backend' || inputs.STACK_TYPE == 'back' || inputs.STACK_TYPE == 'api' || inputs.STACK_TYPE == 'go' || inputs.STACK_TYPE == 'python'))) }}
+    needs: [build-05-front, build-05-back, prep-03-resolve]
+    uses: wellingtonns/remote-pipeline/.github/workflows/update-image-tag.yaml@devops
+    with:
+      ENVIRONMENT: ${{ needs.prep-03-resolve.outputs.environment }}
+      KUBERNETES_MANAGER: ${{ inputs.KUBERNETES_MANAGER }}
+      KUBERNETES_MANIFESTS_PATH: ${{ inputs.KUBERNETES_MANIFESTS_PATH }}
+    secrets: inherit
+
+
+  # deploy-07-sync:
+  #   name: "DEPLOY | ArgoCD Sync"
+  #   if: ${{ always() && (github.ref_name == 'dev' || github.ref_name == 'main') && needs.deploy-06-tag.result == 'success' }}
+  #   needs: [deploy-06-tag, prep-03-resolve]
+  #   uses: wellingtonns/remote-pipeline/.github/workflows/deploy-argocd.yaml@devops
+  #   with:
+  #     APPLICATION: ${{ needs.prep-03-resolve.outputs.repo_name }}
+  #     ENVIRONMENT: ${{ needs.prep-03-resolve.outputs.environment }}
+  #   secrets: inherit

@@ -1,0 +1,125 @@
+name: Validate Env
+
+on:
+  workflow_call:
+    inputs:
+      ENV_FILE_PATH:
+        required: false
+        type: string
+        default: ".env"
+      REQUIRED_VARS:
+        required: true
+        type: string
+      ALLOW_EMPTY_VARS:
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  validate-env:
+    name: Validate .env file
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Validate env structure and safety
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ENV_FILE="${{ inputs.ENV_FILE_PATH }}"
+          REQUIRED_RAW="${{ inputs.REQUIRED_VARS }}"
+          ALLOW_EMPTY_VARS="${{ inputs.ALLOW_EMPTY_VARS }}"
+
+          if [[ ! -f "$ENV_FILE" ]]; then
+            echo "[ERROR] Env file not found: $ENV_FILE"
+            exit 1
+          fi
+
+          declare -A ENV_MAP
+
+          while IFS= read -r line || [[ -n "$line" ]]; do
+            line="${line%$'\r'}"
+
+            # Skip comments and empty lines
+            [[ -z "${line//[[:space:]]/}" ]] && continue
+            [[ "$line" =~ ^[[:space:]]*# ]] && continue
+
+            # Remove optional export prefix
+            line="${line#export }"
+
+            if [[ "$line" != *=* ]]; then
+              echo "[ERROR] Invalid .env line (missing '='): $line"
+              exit 1
+            fi
+
+            key="${line%%=*}"
+            value="${line#*=}"
+
+            key="$(echo "$key" | xargs)"
+
+            if [[ ! "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+              echo "[ERROR] Invalid variable name in .env: '$key'"
+              exit 1
+            fi
+
+            ENV_MAP["$key"]="$value"
+          done < "$ENV_FILE"
+
+          missing=0
+
+          # Accept required vars separated by comma and/or newline
+          normalized_required="$(printf '%s' "$REQUIRED_RAW" | tr ',' '\n')"
+
+          while IFS= read -r req || [[ -n "$req" ]]; do
+            req="$(echo "$req" | xargs)"
+            [[ -z "$req" ]] && continue
+
+            if [[ -z "${ENV_MAP[$req]+x}" ]]; then
+              echo "[ERROR] Required variable is missing: $req"
+              missing=1
+              continue
+            fi
+
+            current_value="${ENV_MAP[$req]}"
+            if [[ "$ALLOW_EMPTY_VARS" != "true" && -z "${current_value//[[:space:]]/}" ]]; then
+              echo "[ERROR] Required variable is empty: $req"
+              missing=1
+            fi
+          done <<< "$normalized_required"
+
+          if [[ "$missing" -ne 0 ]]; then
+            echo "[ERROR] .env validation failed due to missing/empty required variables."
+            exit 1
+          fi
+
+          sensitive_re='(SECRET|TOKEN|PASSWORD|PASSWD|PRIVATE_KEY|API_KEY|ACCESS_KEY|CLIENT_SECRET|CREDENTIAL|AUTH|JWT|KEY)'
+          placeholder_re='^(\$\{[^}]+\}|<[^>]+>|CHANGEME|CHANGE_ME|REPLACE_ME|YOUR_[A-Z0-9_]+|xxx|XXX)?$'
+
+          leaked=0
+          for key in "${!ENV_MAP[@]}"; do
+            if [[ "$key" =~ $sensitive_re ]]; then
+              value="${ENV_MAP[$key]}"
+              value_trimmed="$(echo "$value" | xargs)"
+
+              # Remove surrounding single/double quotes only for validation
+              value_trimmed="${value_trimmed%\"}"
+              value_trimmed="${value_trimmed#\"}"
+              value_trimmed="${value_trimmed%\'}"
+              value_trimmed="${value_trimmed#\'}"
+
+              if [[ ! "$value_trimmed" =~ $placeholder_re ]]; then
+                echo "[ERROR] Sensitive variable appears to contain a real value: $key"
+                leaked=1
+              fi
+            fi
+          done
+
+          if [[ "$leaked" -ne 0 ]]; then
+            echo "[ERROR] Sensitive values detected in .env. Use placeholders and inject real secrets via CI/CD or secret manager."
+            exit 1
+          fi
+
+          echo "[OK] .env validation passed for '$ENV_FILE'."

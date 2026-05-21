@@ -1,123 +1,49 @@
-name: Validate Kustomize
+﻿name: Validate Kustomize
 
 on:
   workflow_call:
     inputs:
-      app_name:
-        description: "Nome logico da aplicacao."
+      ENVIRONMENT:
         required: true
         type: string
-      stack_type:
-        description: "Tipo da stack. Valores aceitos: frontend ou backend."
-        required: true
-        type: string
-      kustomize_path:
-        description: "Caminho da aplicacao dentro do repositorio Kustomize."
-        required: true
-        type: string
-      kustomize_repository:
-        description: "Repositorio que contem os manifests Kustomize."
-        required: true
-        type: string
-      kustomize_ref:
-        description: "Branch do repositorio Kustomize."
+      KUBERNETES_MANIFESTS_PATH:
         required: false
         type: string
-        default: main
-      kustomize_checkout_path:
-        description: "Pasta local onde o repositorio Kustomize sera clonado."
-        required: false
-        type: string
-        default: workloads
-      image_name:
-        description: "Nome da imagem da aplicacao."
-        required: true
-        type: string
-      image_alias:
-        description: "Alias da imagem usado no Kustomize."
-        required: false
-        type: string
-        default: app-image
-      app_namespace:
-        description: "Namespace Kubernetes. Quando vazio, usa app_name."
-        required: false
-        type: string
-        default: ""
-      app_domain:
-        description: "Host do Ingress."
-        required: false
-        type: string
-        default: ""
-      container_port:
-        description: "Porta HTTP do container."
-        required: false
-        type: string
-        default: ""
-      health_path:
-        description: "Path dos probes."
-        required: false
-        type: string
-        default: ""
-      template_path:
-        description: "Pasta modelo dentro do repositorio Kustomize."
-        required: false
-        type: string
-        default: workload-template
-    secrets:
-      KUSTOMIZE_REPO_TOKEN:
-        required: false
-      PIPELINE_FACTORY_ACTION:
-        required: false
+        default: "./iac/kubernetes"
+
+permissions:
+  contents: write
 
 jobs:
   validate-structure:
     if: github.ref_name == 'dev' || github.ref_name == 'main' || github.ref_name == 'master'
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
 
     steps:
-      - name: Validate Kustomize write token
-        shell: bash
-        env:
-          CURRENT_REPOSITORY: ${{ github.repository }}
-          TARGET_REPOSITORY: ${{ inputs.kustomize_repository }}
-          KUSTOMIZE_REPO_TOKEN: ${{ secrets.KUSTOMIZE_REPO_TOKEN }}
-          PIPELINE_FACTORY_ACTION: ${{ secrets.PIPELINE_FACTORY_ACTION }}
-        run: |
-          if [[ "$CURRENT_REPOSITORY" != "$TARGET_REPOSITORY" && -z "$KUSTOMIZE_REPO_TOKEN" && -z "$PIPELINE_FACTORY_ACTION" ]]; then
-            echo "Missing KUSTOMIZE_REPO_TOKEN or PIPELINE_FACTORY_ACTION."
-            echo "The workflow is running from $CURRENT_REPOSITORY, but needs to push changes to $TARGET_REPOSITORY."
-            echo "Create one of these secrets with Contents: Read and write access to $TARGET_REPOSITORY."
-            exit 1
-          fi
-
       - name: Checkout manifests repository
         uses: actions/checkout@v6
         with:
-          token: ${{ secrets.KUSTOMIZE_REPO_TOKEN || secrets.PIPELINE_FACTORY_ACTION || github.token }}
-          repository: ${{ inputs.kustomize_repository }}
-          ref: ${{ inputs.kustomize_ref }}
-          path: ${{ inputs.kustomize_checkout_path }}
+          token: ${{ secrets.KUSTOMIZE_REPO_TOKEN }}
+          repository: wellingtonns/workloads
+          ref: main
           fetch-depth: 0
-          persist-credentials: true
 
-      - name: Ensure app structure from template
+      - name: Ensure app structure from workload-template
         id: structure
         shell: bash
         run: |
           set -euo pipefail
 
           BRANCH_NAME="${{ github.ref_name }}"
-          APP_NAME="${{ inputs.app_name }}"
+          REPO_NAME="${{ github.event.repository.name }}"
+          APP_NAME="$REPO_NAME"
+
           APP_NAME="${APP_NAME%-dev}"
           APP_NAME="${APP_NAME%-prd}"
           APP_NAME="$(echo "$APP_NAME" | tr '[:upper:]' '[:lower:]')"
 
-          cd "${{ inputs.kustomize_checkout_path }}"
-
-          TEMPLATE_DIR="${{ inputs.template_path }}"
-          TARGET_DIR="${{ inputs.kustomize_path }}"
+          TEMPLATE_DIR="workload-template"
+          TARGET_DIR="apps/${APP_NAME}"
 
           if [[ "$BRANCH_NAME" == "dev" ]]; then
             OVERLAY_NAME="dev"
@@ -133,6 +59,7 @@ jobs:
           TEMPLATE_OVERLAY_DIR="${TEMPLATE_DIR}/overlays/${OVERLAY_NAME}"
           TARGET_OVERLAY_DIR="${TARGET_DIR}/overlays/${OVERLAY_NAME}"
 
+          echo "Repository name: $REPO_NAME"
           echo "App name: $APP_NAME"
           echo "Branch: $BRANCH_NAME"
           echo "Selected overlay: $OVERLAY_NAME"
@@ -150,12 +77,15 @@ jobs:
 
           CHANGED=false
 
+          mkdir -p "apps"
+
           if [[ ! -d "$TARGET_DIR" ]]; then
             echo "App directory does not exist. Creating base structure: $TARGET_DIR"
 
             mkdir -p "$TARGET_DIR"
 
             shopt -s dotglob nullglob
+
             for item in "$TEMPLATE_DIR"/*; do
               item_name="$(basename "$item")"
 
@@ -165,6 +95,7 @@ jobs:
 
               cp -R "$item" "$TARGET_DIR/"
             done
+
             shopt -u dotglob nullglob
 
             CHANGED=true
@@ -196,10 +127,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          cd "${{ inputs.kustomize_checkout_path }}"
+          APP_NAME="${{ steps.structure.outputs.app_name }}"
 
-          echo "Resulting structure for ${{ inputs.kustomize_path }}:"
-          find "${{ inputs.kustomize_path }}" -type f | sort
+          echo "Resulting structure for apps/${APP_NAME}:"
+          find "apps/${APP_NAME}" -type f | sort
 
       - name: Commit changes
         if: steps.structure.outputs.changed == 'true'
@@ -207,12 +138,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          cd "${{ inputs.kustomize_checkout_path }}"
-
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add "${{ inputs.kustomize_path }}"
+          git add "apps/${{ steps.structure.outputs.app_name }}"
 
           if git diff --cached --quiet; then
             echo "No changes to commit."
@@ -220,4 +149,4 @@ jobs:
           fi
 
           git commit -m "chore(kustomize): ensure ${{ steps.structure.outputs.overlay_name }} overlay for ${{ steps.structure.outputs.app_name }}"
-          git push origin "HEAD:${{ inputs.kustomize_ref }}"
+          git push origin "HEAD:main"
