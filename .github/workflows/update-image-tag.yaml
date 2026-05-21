@@ -54,9 +54,9 @@ jobs:
         run: |
           set -e
           IMAGE_TAG="${{ github.sha }}"
-          IMAGE_REPOSITORY="europe-west2-docker.pkg.dev/collegia-infra-hub/collegia/${IMAGE_NAME}"
-          git config user.name "collegia-bot"
-          git config user.email "devops@collegia.co.uk"
+          IMAGE_REPOSITORY="ghcr.io/${{ github.repository }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin main
           git reset --hard origin/main
           cd "${{ env.KUBERNETES_MANIFESTS_PATH }}/overlays/${{ env.ENVIRONMENT }}"
