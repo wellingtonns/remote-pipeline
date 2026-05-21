@@ -44,7 +44,7 @@ jobs:
       - name: Checkout workloads
         uses: actions/checkout@v6
         with:
-          repository: Collegia-Partners/workloads
+          repository: wellingtonns/workloads
           token: ${{ secrets.PIPELINE_FACTORY_ACTION }}
           ref: main
           fetch-depth: 30
