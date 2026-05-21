@@ -118,7 +118,7 @@ jobs:
     with:
       STACK_TYPE: ${{ inputs.STACK_TYPE }}
       APPLICATION: ${{ needs.prep-03-resolve.outputs.repo_name }}
-      ACR_REPOSITORY: ${{ needs.prep-03-resolve.outputs.repo_name }}
+      IMAGE_REPOSITORY: ${{ needs.prep-03-resolve.outputs.repo_name }}
       ENVIRONMENT: ${{ needs.prep-03-resolve.outputs.environment }}
       CONTEXT_DIR: ${{ inputs.CONTEXT_DIR }}
       NODE_VERSION: ${{ inputs.NODE_VERSION }}
@@ -134,7 +134,7 @@ jobs:
     with:
       STACK_TYPE: ${{ inputs.STACK_TYPE }}
       APPLICATION: ${{ needs.prep-03-resolve.outputs.repo_name }}
-      ACR_REPOSITORY: ${{ needs.prep-03-resolve.outputs.repo_name }}
+      IMAGE_REPOSITORY: ${{ needs.prep-03-resolve.outputs.repo_name }}
       ENVIRONMENT: ${{ needs.prep-03-resolve.outputs.environment }}
       CONTEXT_DIR: ${{ inputs.CONTEXT_DIR }}
       NIXPACKS_BUILD_CMD: ${{ inputs.NIXPACKS_BUILD_CMD }}
