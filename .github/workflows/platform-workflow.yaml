@@ -37,7 +37,7 @@ on:
 jobs:
   # prep-01-branch-check:
   #   name: "PREP | Branch Check"
-  #   uses: Collegia-Partners/pipeline-factory/.github/workflows/branch-check.yaml@devops
+  #   uses: wellingtonns/remote-pipeline/.github/workflows/branch-check.yaml@devops
 
   prep-02-stack-check:
     name: "PREP | Stack Check"
@@ -104,7 +104,7 @@ jobs:
     name: "PREP | Validate Kustomize"
     if: ${{ github.ref_name == 'dev' || github.ref_name == 'main' }}
     needs: [prep-03-resolve]
-    uses: Collegia-Partners/pipeline-factory/.github/workflows/validate-kustomize.yaml@devops
+    uses: wellingtonns/remote-pipeline/.github/workflows/validate-kustomize.yaml@devops
     with:
       ENVIRONMENT: ${{ needs.prep-03-resolve.outputs.environment }}
       KUBERNETES_MANIFESTS_PATH: ${{ inputs.KUBERNETES_MANIFESTS_PATH }}
@@ -114,7 +114,7 @@ jobs:
     name: "BUILD | Front Image"
     if: ${{ inputs.STACK_TYPE == 'front' || inputs.STACK_TYPE == 'next' || inputs.STACK_TYPE == 'react' }}
     needs: [prep-03-resolve]
-    uses: Collegia-Partners/pipeline-factory/.github/workflows/front-build.yaml@devops
+    uses: wellingtonns/remote-pipeline/.github/workflows/front-build.yaml@devops
     with:
       STACK_TYPE: ${{ inputs.STACK_TYPE }}
       APPLICATION: ${{ needs.prep-03-resolve.outputs.repo_name }}
@@ -130,7 +130,7 @@ jobs:
     name: "BUILD | Back Image"
     if: ${{ inputs.STACK_TYPE == 'back' || inputs.STACK_TYPE == 'backend' || inputs.STACK_TYPE == 'api' || inputs.STACK_TYPE == 'go' || inputs.STACK_TYPE == 'python' }}
     needs: [prep-03-resolve]
-    uses: Collegia-Partners/pipeline-factory/.github/workflows/back-build.yaml@devops
+    uses: wellingtonns/remote-pipeline/.github/workflows/back-build.yaml@devops
     with:
       STACK_TYPE: ${{ inputs.STACK_TYPE }}
       APPLICATION: ${{ needs.prep-03-resolve.outputs.repo_name }}
@@ -145,7 +145,7 @@ jobs:
     name: "DEPLOY | Update Workloads Tag"
     if: ${{ always() && (github.ref_name == 'dev' || github.ref_name == 'main') && ((needs.build-05-front.result == 'success' && (inputs.STACK_TYPE == 'front' || inputs.STACK_TYPE == 'next' || inputs.STACK_TYPE == 'react')) || (needs.build-05-back.result == 'success' && (inputs.STACK_TYPE == 'backend' || inputs.STACK_TYPE == 'back' || inputs.STACK_TYPE == 'api' || inputs.STACK_TYPE == 'go' || inputs.STACK_TYPE == 'python'))) }}
     needs: [build-05-front, build-05-back, prep-03-resolve]
-    uses: Collegia-Partners/pipeline-factory/.github/workflows/update-image-tag.yaml@devops
+    uses: wellingtonns/remote-pipeline/.github/workflows/update-image-tag.yaml@devops
     with:
       ENVIRONMENT: ${{ needs.prep-03-resolve.outputs.environment }}
       KUBERNETES_MANAGER: ${{ inputs.KUBERNETES_MANAGER }}
@@ -157,7 +157,7 @@ jobs:
     name: "DEPLOY | ArgoCD Sync"
     if: ${{ always() && (github.ref_name == 'dev' || github.ref_name == 'main') && needs.deploy-06-tag.result == 'success' }}
     needs: [deploy-06-tag, prep-03-resolve]
-    uses: Collegia-Partners/pipeline-factory/.github/workflows/deploy-argocd.yaml@devops
+    uses: wellingtonns/remote-pipeline/.github/workflows/deploy-argocd.yaml@devops
     with:
       APPLICATION: ${{ needs.prep-03-resolve.outputs.repo_name }}
       ENVIRONMENT: ${{ needs.prep-03-resolve.outputs.environment }}
