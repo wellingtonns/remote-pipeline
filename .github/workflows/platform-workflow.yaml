@@ -25,6 +25,18 @@ on:
         required: false
         type: string
         default: "20"
+      PYTHON_VERSION:
+        required: false
+        type: string
+        default: "3.12"
+      JAVA_VERSION:
+        required: false
+        type: string
+        default: "21"
+      GO_VERSION:
+        required: false
+        type: string
+        default: "1.23"
       NIXPACKS_BUILD_CMD:
         required: false
         type: string
@@ -53,12 +65,12 @@ jobs:
               echo "Stack type '${{ inputs.STACK_TYPE }}' is supported as legacy alias."
               ;;
 
-            next|react|back|backend|api|go|python)
+            next|react|back|backend|api|go|python|java)
               echo "Stack type '${{ inputs.STACK_TYPE }}' is supported."
               ;;
 
             *)
-              echo "Unsupported STACK_TYPE: '${{ inputs.STACK_TYPE }}'. Supported values: front, next, react, back, backend, go, python, api"
+              echo "Unsupported STACK_TYPE: '${{ inputs.STACK_TYPE }}'. Supported values: front, next, react, back, backend, api, go, python, java"
               exit 1
               ;;
           esac
@@ -126,11 +138,59 @@ jobs:
       NIXPACKS_START_CMD: ${{ inputs.NIXPACKS_START_CMD }}
     secrets: inherit
 
-  build-05-back:
-    name: "BUILD | Back Image"
-    if: ${{ inputs.STACK_TYPE == 'back' || inputs.STACK_TYPE == 'backend' || inputs.STACK_TYPE == 'api' || inputs.STACK_TYPE == 'go' || inputs.STACK_TYPE == 'python' }}
+  build-05-python:
+    name: "BUILD | Python Back Image"
+    if: ${{ inputs.STACK_TYPE == 'python' }}
     needs: [prep-03-resolve]
-    uses: wellingtonns/remote-pipeline/.github/workflows/back-build.yaml@devops
+    uses: wellingtonns/remote-pipeline/.github/workflows/python-build.yaml@devops
+    with:
+      STACK_TYPE: python
+      APPLICATION: ${{ needs.prep-03-resolve.outputs.repo_name }}
+      IMAGE_REPOSITORY: ${{ github.repository }}
+      ENVIRONMENT: ${{ needs.prep-03-resolve.outputs.environment }}
+      CONTEXT_DIR: ${{ inputs.CONTEXT_DIR }}
+      PYTHON_VERSION: ${{ inputs.PYTHON_VERSION }}
+      NIXPACKS_BUILD_CMD: ${{ inputs.NIXPACKS_BUILD_CMD }}
+      NIXPACKS_START_CMD: ${{ inputs.NIXPACKS_START_CMD }}
+    secrets: inherit
+
+  build-05-java:
+    name: "BUILD | Java Back Image"
+    if: ${{ inputs.STACK_TYPE == 'java' }}
+    needs: [prep-03-resolve]
+    uses: wellingtonns/remote-pipeline/.github/workflows/java-build.yaml@devops
+    with:
+      STACK_TYPE: java
+      APPLICATION: ${{ needs.prep-03-resolve.outputs.repo_name }}
+      IMAGE_REPOSITORY: ${{ github.repository }}
+      ENVIRONMENT: ${{ needs.prep-03-resolve.outputs.environment }}
+      CONTEXT_DIR: ${{ inputs.CONTEXT_DIR }}
+      JAVA_VERSION: ${{ inputs.JAVA_VERSION }}
+      NIXPACKS_BUILD_CMD: ${{ inputs.NIXPACKS_BUILD_CMD }}
+      NIXPACKS_START_CMD: ${{ inputs.NIXPACKS_START_CMD }}
+    secrets: inherit
+
+  build-05-go:
+    name: "BUILD | Go Back Image"
+    if: ${{ inputs.STACK_TYPE == 'go' }}
+    needs: [prep-03-resolve]
+    uses: wellingtonns/remote-pipeline/.github/workflows/go-build.yaml@devops
+    with:
+      STACK_TYPE: go
+      APPLICATION: ${{ needs.prep-03-resolve.outputs.repo_name }}
+      IMAGE_REPOSITORY: ${{ github.repository }}
+      ENVIRONMENT: ${{ needs.prep-03-resolve.outputs.environment }}
+      CONTEXT_DIR: ${{ inputs.CONTEXT_DIR }}
+      GO_VERSION: ${{ inputs.GO_VERSION }}
+      NIXPACKS_BUILD_CMD: ${{ inputs.NIXPACKS_BUILD_CMD }}
+      NIXPACKS_START_CMD: ${{ inputs.NIXPACKS_START_CMD }}
+    secrets: inherit
+
+  build-05-backend:
+    name: "BUILD | Generic Back Image"
+    if: ${{ inputs.STACK_TYPE == 'back' || inputs.STACK_TYPE == 'backend' || inputs.STACK_TYPE == 'api' }}
+    needs: [prep-03-resolve]
+    uses: wellingtonns/remote-pipeline/.github/workflows/backend-build.yaml@devops
     with:
       STACK_TYPE: ${{ inputs.STACK_TYPE }}
       APPLICATION: ${{ needs.prep-03-resolve.outputs.repo_name }}
@@ -143,8 +203,8 @@ jobs:
     
   deploy-06-tag:
     name: "DEPLOY | Update Workloads Tag"
-    if: ${{ always() && (github.ref_name == 'dev' || github.ref_name == 'main') && ((needs.build-05-front.result == 'success' && (inputs.STACK_TYPE == 'front' || inputs.STACK_TYPE == 'next' || inputs.STACK_TYPE == 'react')) || (needs.build-05-back.result == 'success' && (inputs.STACK_TYPE == 'backend' || inputs.STACK_TYPE == 'back' || inputs.STACK_TYPE == 'api' || inputs.STACK_TYPE == 'go' || inputs.STACK_TYPE == 'python'))) }}
-    needs: [build-05-front, build-05-back, prep-03-resolve]
+    if: ${{ always() && (github.ref_name == 'dev' || github.ref_name == 'main') && (needs.build-05-front.result == 'success' || needs.build-05-python.result == 'success' || needs.build-05-java.result == 'success' || needs.build-05-go.result == 'success' || needs.build-05-backend.result == 'success') }}
+    needs: [build-05-front, build-05-python, build-05-java, build-05-go, build-05-backend, prep-03-resolve]
     uses: wellingtonns/remote-pipeline/.github/workflows/update-image-tag.yaml@devops
     with:
       ENVIRONMENT: ${{ needs.prep-03-resolve.outputs.environment }}

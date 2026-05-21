@@ -1,0 +1,177 @@
+name: Build and Push Python Backend Image
+
+on:
+  workflow_call:
+    inputs:
+      REGISTRY:
+        required: false
+        type: string
+        default: ghcr.io
+
+      IMAGE_REPOSITORY:
+        required: false
+        type: string
+        default: ${{ github.repository }}
+
+      STACK_TYPE:
+        required: false
+        type: string
+        default: python
+
+      CONTEXT_DIR:
+        required: false
+        type: string
+        default: .
+
+      APPLICATION:
+        required: false
+        type: string
+        default: ""
+
+      ENVIRONMENT:
+        required: false
+        type: string
+        default: dev
+
+      PYTHON_VERSION:
+        required: false
+        type: string
+        default: "3.12"
+
+      NIXPACKS_BUILD_CMD:
+        required: false
+        type: string
+        default: ""
+
+      NIXPACKS_START_CMD:
+        required: false
+        type: string
+        default: ""
+
+      PUSH_LATEST_BRANCHES:
+        required: false
+        type: string
+        default: "dev,main"
+
+    outputs:
+      image:
+        description: "Built Python backend image with SHA tag"
+        value: ${{ jobs.build.outputs.image }}
+
+env:
+  REGISTRY: ${{ inputs.REGISTRY }}
+  IMAGE_REPOSITORY: ${{ inputs.IMAGE_REPOSITORY }}
+  STACK_TYPE: ${{ inputs.STACK_TYPE }}
+  CONTEXT_DIR: ${{ inputs.CONTEXT_DIR }}
+  APPLICATION: ${{ inputs.APPLICATION }}
+  ENVIRONMENT: ${{ inputs.ENVIRONMENT }}
+  PYTHON_VERSION: ${{ inputs.PYTHON_VERSION }}
+  NIXPACKS_BUILD_CMD: ${{ inputs.NIXPACKS_BUILD_CMD }}
+  NIXPACKS_START_CMD: ${{ inputs.NIXPACKS_START_CMD }}
+  PUSH_LATEST_BRANCHES: ${{ inputs.PUSH_LATEST_BRANCHES }}
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    name: build-python-image-and-push
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    outputs:
+      image: ${{ steps.build-image.outputs.image }}
+
+    environment:
+      name: ${{ inputs.ENVIRONMENT }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Nixpacks build and push Python backend image
+        id: build-image
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          curl -fsSL https://nixpacks.com/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.local/bin:$PATH"
+
+          if [[ -z "${IMAGE_REPOSITORY}" ]]; then
+            echo "ERROR: IMAGE_REPOSITORY is empty"
+            exit 1
+          fi
+
+          if [[ ! -f "${CONTEXT_DIR}/requirements.txt" && ! -f "${CONTEXT_DIR}/pyproject.toml" && ! -f "${CONTEXT_DIR}/app.py" && ! -f "${CONTEXT_DIR}/main.py" ]]; then
+            echo "ERROR: Python backend files were not found in ${CONTEXT_DIR}"
+            echo "Expected requirements.txt, pyproject.toml, app.py or main.py."
+            exit 1
+          fi
+
+          IMAGE_REPO_LOWER="$(echo "${IMAGE_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
+          IMAGE_BASE="${REGISTRY}/${IMAGE_REPO_LOWER}"
+
+          SHA_TAG="${IMAGE_BASE}:${GITHUB_SHA}"
+          LATEST_TAG="${IMAGE_BASE}:latest-${ENVIRONMENT}"
+          AMD_TAG="${IMAGE_BASE}:${GITHUB_SHA}-amd64"
+
+          SHOULD_PUSH_LATEST="false"
+          NIXPACKS_CMD_ARGS=()
+
+          if [[ -n "${NIXPACKS_BUILD_CMD}" ]]; then
+            NIXPACKS_CMD_ARGS+=(--build-cmd "${NIXPACKS_BUILD_CMD}")
+          elif [[ -f "${CONTEXT_DIR}/requirements.txt" ]]; then
+            NIXPACKS_CMD_ARGS+=(--build-cmd "pip install -r requirements.txt")
+          else
+            NIXPACKS_CMD_ARGS+=(--build-cmd "pip install .")
+          fi
+
+          if [[ -n "${NIXPACKS_START_CMD}" ]]; then
+            NIXPACKS_CMD_ARGS+=(--start-cmd "${NIXPACKS_START_CMD}")
+          elif [[ -f "${CONTEXT_DIR}/app.py" ]]; then
+            NIXPACKS_CMD_ARGS+=(--start-cmd "python app.py")
+          else
+            NIXPACKS_CMD_ARGS+=(--start-cmd "python main.py")
+          fi
+
+          timeout 20m nixpacks build "${CONTEXT_DIR}" \
+            --env APP_ENV="${ENVIRONMENT}" \
+            --env NIXPACKS_PYTHON_VERSION="${PYTHON_VERSION}" \
+            "${NIXPACKS_CMD_ARGS[@]}" \
+            --platform linux/amd64 \
+            --tag "${AMD_TAG}"
+
+          docker push "${AMD_TAG}"
+          docker buildx imagetools create -t "${SHA_TAG}" "${AMD_TAG}"
+
+          IFS=',' read -r -a BRANCHES <<< "${PUSH_LATEST_BRANCHES}"
+          for BR in "${BRANCHES[@]}"; do
+            BR_TRIMMED="$(echo "${BR}" | xargs)"
+
+            if [[ "${GITHUB_REF_NAME}" == "${BR_TRIMMED}" ]]; then
+              SHOULD_PUSH_LATEST="true"
+              break
+            fi
+          done
+
+          if [[ "${SHOULD_PUSH_LATEST}" == "true" ]]; then
+            docker buildx imagetools create -t "${LATEST_TAG}" "${AMD_TAG}"
+            echo "Published latest tag: ${LATEST_TAG}"
+          else
+            echo "Skipping latest tag for branch ${GITHUB_REF_NAME}"
+          fi
+
+          echo "image=${SHA_TAG}" >> "$GITHUB_OUTPUT"
