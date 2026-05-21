@@ -28,7 +28,7 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Ensure app structure from worload-template
+      - name: Ensure app structure from workload-template
         id: structure
         shell: bash
         run: |
@@ -42,7 +42,7 @@ jobs:
           APP_NAME="${APP_NAME%-prd}"
           APP_NAME="$(echo "$APP_NAME" | tr '[:upper:]' '[:lower:]')"
 
-          TEMPLATE_DIR="worload-template"
+          TEMPLATE_DIR="workload-template"
           TARGET_DIR="apps/${APP_NAME}"
 
           if [[ "$BRANCH_NAME" == "dev" ]]; then
