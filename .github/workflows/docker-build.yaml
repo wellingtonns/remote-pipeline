@@ -7,7 +7,7 @@ on:
         required: false
         type: string
         default: collegiaregistryhub.azurecr.io
-      ACR_REPOSITORY:
+      IMAGE_REPOSITORY:
         required: true
         type: string
       GCR_REGISTRY:
@@ -36,9 +36,9 @@ on:
 
 env:
   ACR_REGISTRY: ${{ inputs.ACR_REGISTRY }}
-  ACR_REPOSITORY: ${{ inputs.ACR_REPOSITORY }}
+  IMAGE_REPOSITORY: ${{ inputs.IMAGE_REPOSITORY }}
   GCR_REGISTRY: ${{ inputs.GCR_REGISTRY }}
-  GCR_REPOSITORY: ${{ inputs.ACR_REPOSITORY }}
+  GCR_REPOSITORY: ${{ inputs.IMAGE_REPOSITORY }}
   CONTEXT_DIR: ${{ inputs.CONTEXT_DIR }}
   ENVIRONMENT: ${{ inputs.ENVIRONMENT }}
   APPLICATION: ${{ inputs.APPLICATION }}
