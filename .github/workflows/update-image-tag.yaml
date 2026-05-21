@@ -1,0 +1,69 @@
+name: Update Kubernetes Application Image Tag
+on:
+  workflow_call:
+    inputs:
+      ENVIRONMENT:
+        required: true
+        type: string
+      KUBERNETES_MANAGER:
+        required: false
+        type: string
+        default: "kustomize" #helm or kustomize
+      KUBERNETES_MANIFESTS_PATH:
+        required: false
+        type: string
+
+env:
+  ENVIRONMENT: ${{ inputs.ENVIRONMENT }}
+  KUBERNETES_MANAGER: ${{ inputs.KUBERNETES_MANAGER }}
+  KUBERNETES_MANIFESTS_PATH: ${{ inputs.KUBERNETES_MANIFESTS_PATH }}
+  IMAGE_NAME: ${{ github.event.repository.name }}
+
+permissions:
+  id-token: write
+  contents: write 
+  pull-requests: write
+  issues: write
+  repository-projects: write
+
+jobs:
+  updater:
+    runs-on: ubuntu-latest
+    environment: 
+      name: ${{ inputs.ENVIRONMENT }}
+    steps:
+      - name: Check environment for branch
+        run: |
+          if [[ $GITHUB_REF_NAME != 'main' && $ENVIRONMENT == "prd" ]]; then
+              echo "Deploy on Production environment is only allowed from main branch"
+              exit 1
+          else
+              echo "Deploying on $ENVIRONMENT environment from $GITHUB_REF_NAME branch"
+          fi
+
+      - name: Checkout workloads
+        uses: actions/checkout@v6
+        with:
+          repository: Collegia-Partners/workloads
+          token: ${{ secrets.PIPELINE_FACTORY_ACTION }}
+          ref: main
+          fetch-depth: 30
+
+      - name: Update Kubernetes Application Image Tag
+        shell: bash
+        run: |
+          set -e
+          IMAGE_TAG="${{ github.sha }}"
+          IMAGE_REPOSITORY="europe-west2-docker.pkg.dev/collegia-infra-hub/collegia/${IMAGE_NAME}"
+          git config user.name "collegia-bot"
+          git config user.email "devops@collegia.co.uk"
+          git fetch origin main
+          git reset --hard origin/main
+          cd "${{ env.KUBERNETES_MANIFESTS_PATH }}/overlays/${{ env.ENVIRONMENT }}"
+          kustomize edit set image app=${IMAGE_REPOSITORY}:${IMAGE_TAG}
+          echo "Resultado final:"
+          cat kustomization.yaml
+          cd "$GITHUB_WORKSPACE"
+          git add .
+          git commit -m "chore(${ENVIRONMENT}): update ${IMAGE_NAME} image tag to ${IMAGE_TAG} [skip ci]" || echo "No changes to commit"
+          git push origin HEAD:main

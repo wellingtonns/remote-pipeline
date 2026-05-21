@@ -1,0 +1,62 @@
+name: Sync ArgoCD Application
+on:
+  workflow_call:
+    inputs:
+      ENVIRONMENT:
+        required: true
+        type: string
+      APPLICATION:
+        required: false
+        type: string
+
+env:
+  ENVIRONMENT: ${{ inputs.ENVIRONMENT }}
+  APPLICATION: ${{ inputs.APPLICATION }}
+
+
+permissions:
+  id-token: write
+  contents: write 
+  pull-requests: write
+  issues: write
+  repository-projects: write
+
+jobs:
+  synchronizer:
+    runs-on: ubuntu-latest
+    environment: 
+      name: ${{ inputs.ENVIRONMENT }}
+    steps:
+      - name: Check environment for branch
+        run: |
+          if [[ $GITHUB_REF_NAME != 'main' && $ENVIRONMENT == "prd" ]]; then
+              echo "Deploy on Production environment is only allowed from main branch"
+              exit 1
+          else
+              echo "Deploying on $environment environment from $GITHUB_REF_NAME branch"
+          fi
+
+      - name: Argocd Sync Application
+        uses: Collegia-Partners/argocd-sync-application-action@v1.0.0
+        with:
+          environment: ${{ env.ENVIRONMENT }}
+          argocd-host: ${{ secrets.ARGOCD_URL }}
+          argocd-user: ${{ secrets.ARGOCD_USER }}
+          argocd-password: ${{ secrets.ARGOCD_PASS }}
+          argocd-application: ${{ env.APPLICATION }}-${{ env.ENVIRONMENT }}
+
+      # - name: Slack Notification
+      #   if: always()
+      #   uses: rtCamp/action-slack-notify@v2
+      #   env:
+      #     SLACK_WEBHOOK: ${{ secrets.PIPELINE_SLACK_WEBHOOK }}
+      #     SLACK_CHANNEL: pipelines
+      #     SLACK_COLOR: ${{ job.status }} # or a specific color like 'good' or '#ff00ff'
+      #     SLACK_ICON: https://avatars.githubusercontent.com/u/180990500?s=400&u=d9246676bf5b59f7dd6e6e97d90884560cad81fe&v=4
+      #     SLACK_MESSAGE: '${{ env.APPLICATION }} deploy commit ${{ github.sha }}'
+      #     SLACK_TITLE: 'Deploy ${{ env.APPLICATION }} ${{ env.ENVIRONMENT }}' 
+      #     SLACK_USERNAME: Collegia-Bot
+      #     SLACK_FOOTER: Triggered using collegia-bot and semantic version action
+      #     SLACK_MESSAGE_ON_FAILURE: 'Deploy ${{ env.APPLICATION }} on environment ${{ env.ENVIRONMENT }} failed'
+      #     SLACK_MESSAGE_ON_SUCCESS: 'Deploy ${{ env.APPLICATION }} on environment ${{ env.ENVIRONMENT }} success'
+      #     SLACK_MESSAGE_ON_CANCEL: 'Deploy ${{ env.APPLICATION }} on environment ${{ env.ENVIRONMENT }} cancelled'

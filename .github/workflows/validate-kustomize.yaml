@@ -1,0 +1,152 @@
+﻿name: Validate Kustomize
+
+on:
+  workflow_call:
+    inputs:
+      ENVIRONMENT:
+        required: true
+        type: string
+      KUBERNETES_MANIFESTS_PATH:
+        required: false
+        type: string
+        default: "./iac/kubernetes"
+
+permissions:
+  contents: write
+
+jobs:
+  validate-structure:
+    if: github.ref_name == 'dev' || github.ref_name == 'main' || github.ref_name == 'master'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout manifests repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.PIPELINE_FACTORY_ACTION }}
+          repository: Collegia-Partners/workloads
+          ref: main
+          fetch-depth: 0
+
+      - name: Ensure app structure from iac-model
+        id: structure
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BRANCH_NAME="${{ github.ref_name }}"
+          REPO_NAME="${{ github.event.repository.name }}"
+          APP_NAME="$REPO_NAME"
+
+          APP_NAME="${APP_NAME%-dev}"
+          APP_NAME="${APP_NAME%-prd}"
+          APP_NAME="$(echo "$APP_NAME" | tr '[:upper:]' '[:lower:]')"
+
+          TEMPLATE_DIR="iac-model"
+          TARGET_DIR="apps/${APP_NAME}"
+
+          if [[ "$BRANCH_NAME" == "dev" ]]; then
+            OVERLAY_NAME="dev"
+          elif [[ "$BRANCH_NAME" == "main" || "$BRANCH_NAME" == "master" ]]; then
+            OVERLAY_NAME="prd"
+          else
+            echo "Branch not supported: $BRANCH_NAME"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "app_name=$APP_NAME" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          TEMPLATE_OVERLAY_DIR="${TEMPLATE_DIR}/overlays/${OVERLAY_NAME}"
+          TARGET_OVERLAY_DIR="${TARGET_DIR}/overlays/${OVERLAY_NAME}"
+
+          echo "Repository name: $REPO_NAME"
+          echo "App name: $APP_NAME"
+          echo "Branch: $BRANCH_NAME"
+          echo "Selected overlay: $OVERLAY_NAME"
+          echo "Target directory: $TARGET_DIR"
+
+          if [[ ! -d "$TEMPLATE_DIR" ]]; then
+            echo "Template directory not found: $TEMPLATE_DIR"
+            exit 1
+          fi
+
+          if [[ ! -d "$TEMPLATE_OVERLAY_DIR" ]]; then
+            echo "Template overlay directory not found: $TEMPLATE_OVERLAY_DIR"
+            exit 1
+          fi
+
+          CHANGED=false
+
+          mkdir -p "apps"
+
+          if [[ ! -d "$TARGET_DIR" ]]; then
+            echo "App directory does not exist. Creating base structure: $TARGET_DIR"
+
+            mkdir -p "$TARGET_DIR"
+
+            shopt -s dotglob nullglob
+
+            for item in "$TEMPLATE_DIR"/*; do
+              item_name="$(basename "$item")"
+
+              if [[ "$item_name" == "overlays" ]]; then
+                continue
+              fi
+
+              cp -R "$item" "$TARGET_DIR/"
+            done
+
+            shopt -u dotglob nullglob
+
+            CHANGED=true
+          else
+            echo "App directory already exists: $TARGET_DIR"
+          fi
+
+          if [[ ! -d "$TARGET_OVERLAY_DIR" ]]; then
+            echo "Overlay does not exist. Creating: $TARGET_OVERLAY_DIR"
+
+            mkdir -p "${TARGET_DIR}/overlays"
+            cp -R "$TEMPLATE_OVERLAY_DIR" "$TARGET_OVERLAY_DIR"
+
+            CHANGED=true
+          else
+            echo "Overlay already exists. Nothing to do: $TARGET_OVERLAY_DIR"
+          fi
+
+          if [[ "$CHANGED" == "true" ]]; then
+            find "$TARGET_DIR" -type f -exec sed -i "s/{{APP_NAME}}/$APP_NAME/g" {} +
+          fi
+
+          echo "app_name=$APP_NAME" >> "$GITHUB_OUTPUT"
+          echo "overlay_name=$OVERLAY_NAME" >> "$GITHUB_OUTPUT"
+          echo "changed=$CHANGED" >> "$GITHUB_OUTPUT"
+
+      - name: Show resulting structure
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APP_NAME="${{ steps.structure.outputs.app_name }}"
+
+          echo "Resulting structure for apps/${APP_NAME}:"
+          find "apps/${APP_NAME}" -type f | sort
+
+      - name: Commit changes
+        if: steps.structure.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "collegia-bot"
+          git config user.email "devops@collegia.co.uk"
+
+          git add "apps/${{ steps.structure.outputs.app_name }}"
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git commit -m "chore(kustomize): ensure ${{ steps.structure.outputs.overlay_name }} overlay for ${{ steps.structure.outputs.app_name }}"
+          git push origin "HEAD:main"

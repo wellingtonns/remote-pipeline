@@ -1,0 +1,217 @@
+name: Build and Push Image
+on:
+  workflow_call:
+    inputs:
+      ACR_REGISTRY:
+        required: false
+        type: string
+        default: collegiaregistryhub.azurecr.io
+      STACK_TYPE:
+        required: false
+        type: string
+        default: front
+      ACR_REPOSITORY:
+        required: true
+        type: string
+      GCR_REGISTRY:
+        required: false
+        type: string
+        default: europe-west2-docker.pkg.dev/collegia-infra-hub/collegia
+      CONTEXT_DIR:
+        required: false
+        type: string
+        default: .
+      APPLICATION:
+        required: false
+        type: string
+      ENVIRONMENT:
+        required: false
+        type: string
+        default: dev
+      AZ_REGION:
+        required: false
+        type: string
+        default: "UK South"
+      NODE_VERSION:
+        required: false
+        type: string
+        default: "20"
+      NODE_MAX_OLD_SPACE_MB:
+        required: false
+        type: string
+        default: "6144"
+      NIXPACKS_BUILD_CMD:
+        required: false
+        type: string
+        default: ""
+      NIXPACKS_START_CMD:
+        required: false
+        type: string
+        default: ""
+      PUSH_LATEST_BRANCHES:
+        required: false
+        type: string
+        default: "dev,main"
+    outputs:
+      image:
+        description: "Built image with SHA tag"
+        value: ${{ jobs.build.outputs.image }}
+
+env:
+  ACR_REGISTRY: ${{ inputs.ACR_REGISTRY }}
+  STACK_TYPE: ${{ inputs.STACK_TYPE }}
+  ACR_REPOSITORY: ${{ inputs.ACR_REPOSITORY }}
+  GCR_REGISTRY: ${{ inputs.GCR_REGISTRY }}
+  GCR_REPOSITORY: ${{ inputs.ACR_REPOSITORY }}
+  CONTEXT_DIR: ${{ inputs.CONTEXT_DIR }}
+  ENVIRONMENT: ${{ inputs.ENVIRONMENT }}
+  APPLICATION: ${{ inputs.APPLICATION }}
+  AZ_REGION: ${{ inputs.AZ_REGION }}
+  NODE_VERSION: ${{ inputs.NODE_VERSION }}
+  NODE_MAX_OLD_SPACE_MB: ${{ inputs.NODE_MAX_OLD_SPACE_MB }}
+  NIXPACKS_BUILD_CMD: ${{ inputs.NIXPACKS_BUILD_CMD }}
+  NIXPACKS_START_CMD: ${{ inputs.NIXPACKS_START_CMD }}
+  PUSH_LATEST_BRANCHES: ${{ inputs.PUSH_LATEST_BRANCHES }}
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build:
+    name: build-image-and-push
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    outputs:
+      image: ${{ steps.build-image-gcr.outputs.image }}
+    environment:
+      name: ${{ inputs.ENVIRONMENT }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - uses: 'google-github-actions/auth@v2'
+        id: gcp-auth
+        with:
+          token_format: access_token
+          project_id: "collegia-infra-hub"
+          workload_identity_provider: 'projects/1068935068736/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
+          service_account: 'github-actions-user@collegia-infra-hub.iam.gserviceaccount.com'
+
+      - name: Login to GCR
+        uses: docker/login-action@v3
+        with:
+          registry: europe-west2-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.gcp-auth.outputs.access_token }}
+
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Nixpacks build and push (amd64)
+        id: build-image-gcr
+        shell: bash
+        env:
+          FRONTEND_VARS_JSON: ${{ toJson(vars) }}
+        run: |
+          set -euxo pipefail
+
+          curl -fsSL https://nixpacks.com/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.local/bin:$PATH"
+
+          IMAGE_REPO_LOWER="$(echo "${GCR_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
+          IMAGE_BASE="${GCR_REGISTRY}/${IMAGE_REPO_LOWER}"
+          SHA_TAG="${IMAGE_BASE}:${GITHUB_SHA}"
+          LATEST_TAG="${IMAGE_BASE}:latest-${ENVIRONMENT}"
+          AMD_TAG="${IMAGE_BASE}:${GITHUB_SHA}-amd64"
+          SHOULD_PUSH_LATEST="false"
+          FRONTEND_ENV_ARGS=()
+          NIXPACKS_CMD_ARGS=()
+          FRONTEND_ENV_FILE="${CONTEXT_DIR%/}/.env.local"
+
+          mkdir -p "${CONTEXT_DIR}"
+          : > "${FRONTEND_ENV_FILE}"
+
+          while IFS= read -r ENTRY; do
+            KEY="$(jq -r '.key' <<< "${ENTRY}")"
+            VALUE="$(jq -r '.value | tostring' <<< "${ENTRY}")"
+            FRONTEND_ENV_ARGS+=(--env "${KEY}=${VALUE}")
+            ESCAPED_VALUE="${VALUE//\\/\\\\}"
+            ESCAPED_VALUE="${ESCAPED_VALUE//\"/\\\"}"
+            set +x
+            printf '%s="%s"\n' "${KEY}" "${ESCAPED_VALUE}" >> "${FRONTEND_ENV_FILE}"
+            set -x
+          done < <(
+            jq -c '
+              to_entries[]
+              | select(.key | test("^(NEXT_PUBLIC_|REACT_APP_|VITE_)"))
+            ' <<< "${FRONTEND_VARS_JSON}"
+          )
+
+          echo "Prepared $(wc -l < "${FRONTEND_ENV_FILE}" | xargs) frontend environment variables"
+
+          if [[ -n "${NIXPACKS_BUILD_CMD}" ]]; then
+            NIXPACKS_CMD_ARGS+=(--build-cmd "${NIXPACKS_BUILD_CMD}")
+          elif [[ "${STACK_TYPE}" == "react" ]]; then
+            NIXPACKS_CMD_ARGS+=(--build-cmd "yarn build")
+          fi
+
+          if [[ -n "${NIXPACKS_START_CMD}" ]]; then
+            NIXPACKS_CMD_ARGS+=(--start-cmd "${NIXPACKS_START_CMD}")
+          elif [[ "${STACK_TYPE}" == "react" ]]; then
+            NIXPACKS_CMD_ARGS+=(--start-cmd "npx --yes serve -s build -l 3000")
+          fi
+
+          timeout 20m nixpacks build "${CONTEXT_DIR}" \
+            --env APP_ENV="${ENVIRONMENT}" \
+            --env GH_PACKAGES_TOKEN="${{ secrets.AUTOMATED_GIAN_TOKEN }}" \
+            --env NIXPACKS_NODE_VERSION="${NODE_VERSION}" \
+            --env NODE_OPTIONS="--max_old_space_size=${NODE_MAX_OLD_SPACE_MB}" \
+            "${FRONTEND_ENV_ARGS[@]}" \
+            "${NIXPACKS_CMD_ARGS[@]}" \
+            --platform linux/amd64 \
+            --tag "${AMD_TAG}"
+          docker push "${AMD_TAG}"
+
+          docker buildx imagetools create -t "${SHA_TAG}" "${AMD_TAG}"
+
+          IFS=',' read -r -a BRANCHES <<< "${PUSH_LATEST_BRANCHES}"
+          for BR in "${BRANCHES[@]}"; do
+            BR_TRIMMED="$(echo "${BR}" | xargs)"
+            if [[ "${GITHUB_REF_NAME}" == "${BR_TRIMMED}" ]]; then
+              SHOULD_PUSH_LATEST="true"
+              break
+            fi
+          done
+
+          if [[ "${SHOULD_PUSH_LATEST}" == "true" ]]; then
+            docker buildx imagetools create -t "${LATEST_TAG}" "${AMD_TAG}"
+            echo "Published latest tag: ${LATEST_TAG}"
+          else
+            echo "Skipping latest tag for branch ${GITHUB_REF_NAME}"
+          fi
+
+          echo "image=${SHA_TAG}" >> "$GITHUB_OUTPUT"
+
+      # - name: Slack Notification
+      #   if: failure()
+      #   uses: rtCamp/action-slack-notify@v2
+      #   env:
+      #     SLACK_WEBHOOK: ${{ secrets.PIPELINE_SLACK_WEBHOOK }}
+      #     SLACK_CHANNEL: pipelines
+      #     SLACK_COLOR: ${{ job.status }}
+      #     SLACK_ICON: https://avatars.githubusercontent.com/u/180990500?s=400&u=d9246676bf5b59f7dd6e6e97d90884560cad81fe&v=4
+      #     SLACK_MESSAGE: '${{ env.APPLICATION }} build and push commit ${{ github.sha }}'
+      #     SLACK_TITLE: 'Build and Push Front ${{ env.APPLICATION }} ${{ env.ENVIRONMENT }}'
+      #     SLACK_USERNAME: Collegia-Bot
+      #     SLACK_FOOTER: Triggered using collegia-bot and semantic version action
+      #     SLACK_MESSAGE_ON_FAILURE: 'Build and push front ${{ env.APPLICATION }} on environment ${{ env.ENVIRONMENT }} failed'
+      #     SLACK_MESSAGE_ON_SUCCESS: 'Build and push front ${{ env.APPLICATION }} on environment ${{ env.ENVIRONMENT }} succeeded'
+      #     SLACK_MESSAGE_ON_CANCEL: 'Build and push front ${{ env.APPLICATION }} on environment ${{ env.ENVIRONMENT }} cancelled'
