@@ -32,6 +32,10 @@ on:
         required: false
         type: string
         default: dev
+      NODE_VERSION:
+        required: false
+        type: string
+        default: "20"
 
       NIXPACKS_BUILD_CMD:
         required: false
@@ -60,6 +64,7 @@ env:
   CONTEXT_DIR: ${{ inputs.CONTEXT_DIR }}
   APPLICATION: ${{ inputs.APPLICATION }}
   ENVIRONMENT: ${{ inputs.ENVIRONMENT }}
+  NODE_VERSION: ${{ inputs.NODE_VERSION }}
   NIXPACKS_BUILD_CMD: ${{ inputs.NIXPACKS_BUILD_CMD }}
   NIXPACKS_START_CMD: ${{ inputs.NIXPACKS_START_CMD }}
   PUSH_LATEST_BRANCHES: ${{ inputs.PUSH_LATEST_BRANCHES }}
@@ -103,6 +108,7 @@ jobs:
           REGISTRY: ${{ inputs.REGISTRY }}
           IMAGE_REPOSITORY: ${{ inputs.IMAGE_REPOSITORY }}
           ENVIRONMENT: ${{ inputs.ENVIRONMENT }}
+          NODE_VERSION: ${{ inputs.NODE_VERSION }}
           NIXPACKS_BUILD_CMD: ${{ inputs.NIXPACKS_BUILD_CMD }}
           NIXPACKS_START_CMD: ${{ inputs.NIXPACKS_START_CMD }}
           PUSH_LATEST_BRANCHES: ${{ inputs.PUSH_LATEST_BRANCHES }}
@@ -236,6 +242,7 @@ jobs:
 
           timeout 20m nixpacks build "${CONTEXT_DIR}" \
             --env APP_ENV="${ENVIRONMENT}" \
+            --env NIXPACKS_NODE_VERSION="${NODE_VERSION}" \
             "${NIXPACKS_CMD_ARGS[@]}" \
             --platform linux/amd64 \
             --tag "${AMD_TAG}"
