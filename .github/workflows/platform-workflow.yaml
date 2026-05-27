@@ -206,26 +206,11 @@ jobs:
       NIXPACKS_START_CMD: ${{ inputs.NIXPACKS_START_CMD }}
     secrets: inherit
 
-  build-05-php:
-    name: "BUILD | PHP Back Image"
-    if: ${{ inputs.STACK_TYPE == 'php' || inputs.STACK_TYPE == 'laravel' }}
-    needs: [prep-03-resolve]
-    uses: wellingtonns/remote-pipeline/.github/workflows/php-nixpacks.yaml@devops
-    with:
-      STACK_TYPE: ${{ inputs.STACK_TYPE }}
-      APPLICATION: ${{ needs.prep-03-resolve.outputs.repo_name }}
-      IMAGE_REPOSITORY: ${{ github.repository }}
-      ENVIRONMENT: ${{ needs.prep-03-resolve.outputs.environment }}
-      CONTEXT_DIR: ${{ inputs.CONTEXT_DIR }}
-      NIXPACKS_BUILD_CMD: ${{ inputs.NIXPACKS_BUILD_CMD }}
-      NIXPACKS_START_CMD: ${{ inputs.NIXPACKS_START_CMD }}
-    secrets: inherit
-
   build-05-php-template:
     name: "BUILD | PHP Template Image"
-    if: ${{ inputs.STACK_TYPE == 'php-template' || inputs.STACK_TYPE == 'laravel-template' }}
+    if: ${{ inputs.STACK_TYPE == 'php' || inputs.STACK_TYPE == 'laravel' }}
     needs: [prep-03-resolve]
-    uses: wellingtonns/remote-pipeline/.github/workflows/php-template-docker.yaml@devops
+    uses: wellingtonns/remote-pipeline/.github/workflows/php-build.yaml@devops
     with:
       APPLICATION: ${{ needs.prep-03-resolve.outputs.repo_name }}
       IMAGE_REPOSITORY: ${{ github.repository }}
