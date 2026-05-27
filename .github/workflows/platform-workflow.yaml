@@ -208,7 +208,7 @@ jobs:
 
   build-05-php-template:
     name: "BUILD | PHP Template Image"
-    if: ${{ inputs.STACK_TYPE == 'php' || inputs.STACK_TYPE == 'laravel' }}
+    if: ${{ inputs.STACK_TYPE == 'php' }}
     needs: [prep-03-resolve]
     uses: wellingtonns/remote-pipeline/.github/workflows/php-build.yaml@devops
     with:
@@ -220,6 +220,16 @@ jobs:
       APP_PORT: ${{ inputs.APP_PORT }}
       START_COMMAND: ${{ inputs.PHP_START_COMMAND }}
       COMPOSER_INSTALL_ARGS: ${{ inputs.PHP_COMPOSER_INSTALL_ARGS }}
+    secrets: inherit
+
+  build-05-laravel:
+    name: "BUILD | Laravel App"
+    if: ${{ inputs.STACK_TYPE == 'laravel' }}
+    needs: [prep-03-resolve]
+    uses: wellingtonns/remote-pipeline/.github/workflows/laravel-build.yaml@devops
+    with:
+      CONTEXT_DIR: ${{ inputs.CONTEXT_DIR }}
+      PHP_VERSION: ${{ inputs.PHP_VERSION }}
     secrets: inherit
 
   build-05-backend:
