@@ -1,4 +1,4 @@
-name: Build and Push PHP Backend Image with Template Dockerfile Legacy
+name: Build and Push PHP
 
 on:
   workflow_call:
@@ -69,7 +69,7 @@ permissions:
 
 jobs:
   build:
-    name: build-php-template-image-and-push-legacy
+    name: build-php
     runs-on: ubuntu-latest
     timeout-minutes: 25
     outputs:
@@ -152,7 +152,7 @@ jobs:
           CMD ["sh", "-lc", "${START_COMMAND}"]
           EOF
 
-      - name: Build and push PHP backend image from legacy template
+      - name: Build and push PHP
         id: build-image
         shell: bash
         env:

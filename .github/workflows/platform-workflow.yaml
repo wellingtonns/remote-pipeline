@@ -85,12 +85,12 @@ jobs:
               echo "Stack type '${{ inputs.STACK_TYPE }}' is supported as legacy alias."
               ;;
 
-            next|react|back|backend|api|go|python|java|php|laravel|php-template|laravel-template)
+            next|react|back|backend|api|go|python|java|php|laravel)
               echo "Stack type '${{ inputs.STACK_TYPE }}' is supported."
               ;;
 
             *)
-              echo "Unsupported STACK_TYPE: '${{ inputs.STACK_TYPE }}'. Supported values: front, next, react, back, backend, api, go, python, java, php, laravel, php-template, laravel-template"
+              echo "Unsupported STACK_TYPE: '${{ inputs.STACK_TYPE }}'. Supported values: front, next, react, back, backend, api, go, python, java, php, laravel"
               exit 1
               ;;
           esac
@@ -206,9 +206,9 @@ jobs:
       NIXPACKS_START_CMD: ${{ inputs.NIXPACKS_START_CMD }}
     secrets: inherit
 
-  build-05-php-template:
-    name: "BUILD | PHP Template Image"
-    if: ${{ inputs.STACK_TYPE == 'php' || inputs.STACK_TYPE == 'php-template' }}
+  build-05-php:
+    name: "BUILD | PHP Image"
+    if: ${{ inputs.STACK_TYPE == 'php' || inputs.STACK_TYPE == 'laravel' }}
     needs: [prep-03-resolve]
     uses: wellingtonns/remote-pipeline/.github/workflows/php-build.yaml@devops
     with:
@@ -222,23 +222,13 @@ jobs:
       COMPOSER_INSTALL_ARGS: ${{ inputs.PHP_COMPOSER_INSTALL_ARGS }}
     secrets: inherit
 
-  # build-05-laravel:
-  #   name: "BUILD | Laravel App"
-  #   if: ${{ inputs.STACK_TYPE == 'laravel' }}
-  #   needs: [prep-03-resolve]
-  #   uses: wellingtonns/remote-pipeline/.github/workflows/laravel-build.yaml@devops
-  #   with:
-  #     CONTEXT_DIR: ${{ inputs.CONTEXT_DIR }}
-  #     PHP_VERSION: ${{ inputs.PHP_VERSION }}
-  #   secrets: inherit
-
   build-05-backend:
     name: "BUILD | Generic Back Image"
-    if: ${{ inputs.STACK_TYPE == 'back' || inputs.STACK_TYPE == 'backend' || inputs.STACK_TYPE == 'api' || inputs.STACK_TYPE == 'laravel' || inputs.STACK_TYPE == 'laravel-template' }}
+    if: ${{ inputs.STACK_TYPE == 'back' || inputs.STACK_TYPE == 'backend' || inputs.STACK_TYPE == 'api' }}
     needs: [prep-03-resolve]
     uses: wellingtonns/remote-pipeline/.github/workflows/backend-build.yaml@devops
     with:
-      STACK_TYPE: ${{ (inputs.STACK_TYPE == 'laravel' || inputs.STACK_TYPE == 'laravel-template') && 'php' || inputs.STACK_TYPE }}
+      STACK_TYPE: ${{ inputs.STACK_TYPE }}
       APPLICATION: ${{ needs.prep-03-resolve.outputs.repo_name }}
       IMAGE_REPOSITORY: ${{ github.repository }}
       ENVIRONMENT: ${{ needs.prep-03-resolve.outputs.environment }}
@@ -250,8 +240,8 @@ jobs:
     
   deploy-06-tag:
     name: "DEPLOY | Update Workloads Tag"
-    if: ${{ always() && (github.ref_name == 'dev' || github.ref_name == 'main') && (needs.build-05-front.result == 'success' || needs.build-05-python.result == 'success' || needs.build-05-java.result == 'success' || needs.build-05-go.result == 'success' || needs.build-05-php-template.result == 'success' || needs.build-05-backend.result == 'success') }}
-    needs: [build-05-front, build-05-python, build-05-java, build-05-go, build-05-php-template, build-05-backend, prep-03-resolve]
+    if: ${{ always() && (github.ref_name == 'dev' || github.ref_name == 'main') && (needs.build-05-front.result == 'success' || needs.build-05-python.result == 'success' || needs.build-05-java.result == 'success' || needs.build-05-go.result == 'success' || needs.build-05-php.result == 'success' || needs.build-05-backend.result == 'success') }}
+    needs: [build-05-front, build-05-python, build-05-java, build-05-go, build-05-php, build-05-backend, prep-03-resolve]
     uses: wellingtonns/remote-pipeline/.github/workflows/update-image-tag.yaml@devops
     with:
       ENVIRONMENT: ${{ needs.prep-03-resolve.outputs.environment }}
