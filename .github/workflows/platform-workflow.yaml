@@ -222,15 +222,15 @@ jobs:
       COMPOSER_INSTALL_ARGS: ${{ inputs.PHP_COMPOSER_INSTALL_ARGS }}
     secrets: inherit
 
-  build-05-laravel:
-    name: "BUILD | Laravel App"
-    if: ${{ inputs.STACK_TYPE == 'laravel' }}
-    needs: [prep-03-resolve]
-    uses: wellingtonns/remote-pipeline/.github/workflows/laravel-build.yaml@devops
-    with:
-      CONTEXT_DIR: ${{ inputs.CONTEXT_DIR }}
-      PHP_VERSION: ${{ inputs.PHP_VERSION }}
-    secrets: inherit
+  # build-05-laravel:
+  #   name: "BUILD | Laravel App"
+  #   if: ${{ inputs.STACK_TYPE == 'laravel' }}
+  #   needs: [prep-03-resolve]
+  #   uses: wellingtonns/remote-pipeline/.github/workflows/laravel-build.yaml@devops
+  #   with:
+  #     CONTEXT_DIR: ${{ inputs.CONTEXT_DIR }}
+  #     PHP_VERSION: ${{ inputs.PHP_VERSION }}
+  #   secrets: inherit
 
   build-05-backend:
     name: "BUILD | Generic Back Image"

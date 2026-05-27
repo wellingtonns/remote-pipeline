@@ -1,46 +1,3 @@
-# name: Laravel Build
-
-# on:
-#   workflow_call:
-#     inputs:
-#       CONTEXT_DIR:
-#         required: false
-#         type: string
-#         default: ./
-#       PHP_VERSION:
-#         required: false
-#         type: string
-#         default: "8.3"
-
-# jobs:
-#   build:
-#     runs-on: ubuntu-latest
-
-#     steps:
-#       - name: Checkout
-#         uses: actions/checkout@v4
-
-#       - name: Setup PHP
-#         uses: shivammathur/setup-php@v2
-#         with:
-#           php-version: ${{ inputs.PHP_VERSION }}
-#           extensions: mbstring, xml, ctype, json, tokenizer, bcmath, intl, pdo_mysql, zip
-#           tools: composer:v2
-
-#       - name: Install PHP dependencies
-#         working-directory: ${{ inputs.CONTEXT_DIR }}
-#         run: composer install --no-interaction --prefer-dist --optimize-autoloader
-
-#       - name: Prepare Laravel
-#         working-directory: ${{ inputs.CONTEXT_DIR }}
-#         run: |
-#           cp .env.example .env || true
-#           php artisan key:generate --force
-#           php artisan config:cache
-#           php artisan route:cache
-#           php artisan view:cache
-
-
 name: Laravel Build
 
 on:
@@ -49,26 +6,15 @@ on:
       CONTEXT_DIR:
         required: false
         type: string
-        default: .
+        default: ./
       PHP_VERSION:
         required: false
         type: string
         default: "8.3"
-      IMAGE_NAME:
-        required: true
-        type: string
-      IMAGE_TAG:
-        required: false
-        type: string
-        default: ${{ github.sha }}
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-      packages: write
 
     steps:
       - name: Checkout
@@ -90,25 +36,6 @@ jobs:
         run: |
           cp .env.example .env || true
           php artisan key:generate --force
-          php artisan config:clear
-          php artisan route:clear
-          php artisan view:clear
           php artisan config:cache
           php artisan route:cache
           php artisan view:cache
-
-      - name: Login GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-
-      - name: Build and Push Docker image
-        uses: docker/build-push-action@v6
-        with:
-          context: ${{ inputs.CONTEXT_DIR }}
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/${{ inputs.IMAGE_NAME }}:${{ inputs.IMAGE_TAG }}
-            ghcr.io/${{ github.repository_owner }}/${{ inputs.IMAGE_NAME }}:latest
