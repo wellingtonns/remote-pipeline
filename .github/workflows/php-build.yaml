@@ -33,10 +33,15 @@ on:
         type: string
         default: dev
 
-      DOCKER_FILE_NAME:
+      NIXPACKS_BUILD_CMD:
         required: false
         type: string
-        default: Dockerfile
+        default: ""
+
+      NIXPACKS_START_CMD:
+        required: false
+        type: string
+        default: ""
 
       PUSH_LATEST_BRANCHES:
         required: false
@@ -55,7 +60,8 @@ env:
   CONTEXT_DIR: ${{ inputs.CONTEXT_DIR }}
   APPLICATION: ${{ inputs.APPLICATION }}
   ENVIRONMENT: ${{ inputs.ENVIRONMENT }}
-  DOCKER_FILE_NAME: ${{ inputs.DOCKER_FILE_NAME }}
+  NIXPACKS_BUILD_CMD: ${{ inputs.NIXPACKS_BUILD_CMD }}
+  NIXPACKS_START_CMD: ${{ inputs.NIXPACKS_START_CMD }}
   PUSH_LATEST_BRANCHES: ${{ inputs.PUSH_LATEST_BRANCHES }}
 
 permissions:
@@ -88,11 +94,15 @@ jobs:
       - name: Setup Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push PHP backend image
+      - name: Nixpacks build and push PHP backend image
         id: build-image
         shell: bash
         run: |
           set -euxo pipefail
+
+          curl -fsSL https://nixpacks.com/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.local/bin:$PATH"
 
           if [[ -z "${IMAGE_REPOSITORY}" ]]; then
             echo "ERROR: IMAGE_REPOSITORY is empty"
@@ -105,11 +115,6 @@ jobs:
             exit 1
           fi
 
-          if [[ ! -f "${CONTEXT_DIR}/${DOCKER_FILE_NAME}" ]]; then
-            echo "ERROR: Dockerfile ${DOCKER_FILE_NAME} was not found in ${CONTEXT_DIR}"
-            exit 1
-          fi
-
           IMAGE_REPO_LOWER="$(echo "${IMAGE_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
           IMAGE_BASE="${REGISTRY}/${IMAGE_REPO_LOWER}"
 
@@ -118,13 +123,23 @@ jobs:
           AMD_TAG="${IMAGE_BASE}:${GITHUB_SHA}-amd64"
 
           SHOULD_PUSH_LATEST="false"
+          NIXPACKS_CMD_ARGS=()
 
-          docker buildx build "${CONTEXT_DIR}" \
-            --file "${CONTEXT_DIR}/${DOCKER_FILE_NAME}" \
+          if [[ -n "${NIXPACKS_BUILD_CMD}" ]]; then
+            NIXPACKS_CMD_ARGS+=(--build-cmd "${NIXPACKS_BUILD_CMD}")
+          fi
+
+          if [[ -n "${NIXPACKS_START_CMD}" ]]; then
+            NIXPACKS_CMD_ARGS+=(--start-cmd "${NIXPACKS_START_CMD}")
+          fi
+
+          timeout 20m nixpacks build "${CONTEXT_DIR}" \
+            --env APP_ENV="${ENVIRONMENT}" \
+            "${NIXPACKS_CMD_ARGS[@]}" \
             --platform linux/amd64 \
-            --tag "${AMD_TAG}" \
-            --push
+            --tag "${AMD_TAG}"
 
+          docker push "${AMD_TAG}"
           docker buildx imagetools create -t "${SHA_TAG}" "${AMD_TAG}"
 
           IFS=',' read -r -a BRANCHES <<< "${PUSH_LATEST_BRANCHES}"
