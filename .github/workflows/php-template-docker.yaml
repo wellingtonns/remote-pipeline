@@ -35,6 +35,10 @@ on:
         required: false
         type: string
         default: "20"
+      START_COMMAND:
+        required: false
+        type: string
+        default: ""
       COMPOSER_INSTALL_ARGS:
         required: false
         type: string
@@ -76,6 +80,7 @@ env:
   PHP_VERSION: ${{ inputs.PHP_VERSION }}
   APP_PORT: ${{ inputs.APP_PORT }}
   NODE_VERSION: ${{ inputs.NODE_VERSION }}
+  START_COMMAND: ${{ inputs.START_COMMAND }}
   COMPOSER_INSTALL_ARGS: ${{ inputs.COMPOSER_INSTALL_ARGS }}
   FORCE_HTTPS: ${{ inputs.FORCE_HTTPS }}
   WAIT_FOR_DB: ${{ inputs.WAIT_FOR_DB }}
@@ -154,7 +159,8 @@ jobs:
               FORCE_HTTPS=${FORCE_HTTPS} \\
               WAIT_FOR_DB=${WAIT_FOR_DB} \\
               RUN_MIGRATIONS=${RUN_MIGRATIONS} \\
-              SCHEDULER_ENABLED=${SCHEDULER_ENABLED}
+              SCHEDULER_ENABLED=${SCHEDULER_ENABLED} \\
+              START_COMMAND=${START_COMMAND}
 
           RUN apt-get update && apt-get install -y --no-install-recommends \\
               git \\
