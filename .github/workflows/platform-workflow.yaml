@@ -24,7 +24,7 @@ on:
       NODE_VERSION:
         required: false
         type: string
-        default: "20"
+        default: "22"
       PYTHON_VERSION:
         required: false
         type: string
