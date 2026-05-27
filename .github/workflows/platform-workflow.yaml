@@ -210,7 +210,7 @@ jobs:
     name: "BUILD | PHP Back Image"
     if: ${{ inputs.STACK_TYPE == 'php' || inputs.STACK_TYPE == 'laravel' }}
     needs: [prep-03-resolve]
-    uses: wellingtonns/remote-pipeline/.github/workflows/php-template-docker.yaml@devops
+    uses: wellingtonns/remote-pipeline/.github/workflows/php-nixpacks.yaml@devops
     with:
       STACK_TYPE: ${{ inputs.STACK_TYPE }}
       APPLICATION: ${{ needs.prep-03-resolve.outputs.repo_name }}
