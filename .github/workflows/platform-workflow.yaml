@@ -239,8 +239,8 @@ jobs:
     
   deploy-06-tag:
     name: "DEPLOY | Update Workloads Tag"
-    if: ${{ always() && (github.ref_name == 'dev' || github.ref_name == 'main') && (needs.build-05-front.result == 'success' || needs.build-05-python.result == 'success' || needs.build-05-java.result == 'success' || needs.build-05-go.result == 'success' || needs.build-05-php.result == 'success' || needs.build-05-php-template.result == 'success' || needs.build-05-backend.result == 'success') }}
-    needs: [build-05-front, build-05-python, build-05-java, build-05-go, build-05-php, build-05-php-template, build-05-backend, prep-03-resolve]
+    if: ${{ always() && (github.ref_name == 'dev' || github.ref_name == 'main') && (needs.build-05-front.result == 'success' || needs.build-05-python.result == 'success' || needs.build-05-java.result == 'success' || needs.build-05-go.result == 'success' || needs.build-05-php-template.result == 'success' || needs.build-05-backend.result == 'success') }}
+    needs: [build-05-front, build-05-python, build-05-java, build-05-go, build-05-php-template, build-05-backend, prep-03-resolve]
     uses: wellingtonns/remote-pipeline/.github/workflows/update-image-tag.yaml@devops
     with:
       ENVIRONMENT: ${{ needs.prep-03-resolve.outputs.environment }}
