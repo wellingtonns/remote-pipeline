@@ -137,7 +137,15 @@ jobs:
           COPY . .
           COPY --from=vendor /app/vendor ./vendor
 
-          RUN if [ -f .env.example ] && [ ! -f .env ]; then cp .env.example .env; fi
+          RUN if [ -f .env.example ] && [ ! -f .env ]; then cp .env.example .env; fi \
+              && if [ -f artisan ] && [ -f .env ]; then \
+                   if ! grep -Eq '^APP_KEY=.+$' .env; then \
+                     echo "Laravel detected: generating APP_KEY in .env"; \
+                     php artisan key:generate --force; \
+                   else \
+                     echo "Laravel detected: APP_KEY already present in .env"; \
+                   fi; \
+                 fi
 
           EXPOSE ${APP_PORT}
 
