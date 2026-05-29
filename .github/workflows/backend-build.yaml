@@ -115,6 +115,43 @@ jobs:
         run: |
           set -euxo pipefail
 
+          add_nixpacks_cmd_arg() {
+            local flag="$1"
+            local value="$2"
+
+            if [[ -n "${value}" ]]; then
+              NIXPACKS_CMD_ARGS+=("${flag}" "${value}")
+            fi
+          }
+
+          add_nixpacks_env() {
+            local name="$1"
+            local value="$2"
+
+            if [[ -n "${name}" && -n "${value}" ]]; then
+              NIXPACKS_ENV_ARGS+=(--env "${name}=${value}")
+            fi
+          }
+
+          detect_stack_type() {
+            echo "Detecting backend stack automatically..." >&2
+
+            if [[ -f "${CONTEXT_DIR}/pom.xml" || -f "${CONTEXT_DIR}/build.gradle" || -f "${CONTEXT_DIR}/gradlew" ]]; then
+              echo "java"
+            elif [[ -f "${CONTEXT_DIR}/requirements.txt" || -f "${CONTEXT_DIR}/pyproject.toml" || -f "${CONTEXT_DIR}/app.py" || -f "${CONTEXT_DIR}/main.py" ]]; then
+              echo "python"
+            elif [[ -f "${CONTEXT_DIR}/go.mod" ]]; then
+              echo "go"
+            elif [[ -f "${CONTEXT_DIR}/composer.json" ]]; then
+              echo "php"
+            elif compgen -G "${CONTEXT_DIR}/*.csproj" > /dev/null; then
+              echo "dotnet"
+            else
+              echo "Could not detect a known backend language. Using generic Nixpacks backend build." >&2
+              echo "generic"
+            fi
+          }
+
           # Install Nixpacks in the runner.
           curl -fsSL https://nixpacks.com/install.sh | bash
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
@@ -136,252 +173,77 @@ jobs:
           SHOULD_PUSH_LATEST="false"
           NIXPACKS_CMD_ARGS=()
           NIXPACKS_ENV_ARGS=()
-          RESOLVED_STACK_VERSION=""
-          RESOLVED_ASSET_NODE_VERSION=""
+          DEFAULT_BUILD_CMD=""
+          DEFAULT_START_CMD=""
+          RUNTIME_ENV_NAME=""
+          ASSET_NODE_VERSION=""
 
-          # Auto-detect the backend stack when a generic stack type is used.
-          if [[ -z "${STACK_TYPE}" || "${STACK_TYPE}" == "back" || "${STACK_TYPE}" == "backend" || "${STACK_TYPE}" == "api" ]]; then
-            echo "Detecting backend stack automatically..."
-
-            if [[ -f "${CONTEXT_DIR}/pom.xml" || -f "${CONTEXT_DIR}/build.gradle" || -f "${CONTEXT_DIR}/gradlew" ]]; then
-              STACK_TYPE="java"
-            elif [[ -f "${CONTEXT_DIR}/requirements.txt" || -f "${CONTEXT_DIR}/pyproject.toml" || -f "${CONTEXT_DIR}/app.py" || -f "${CONTEXT_DIR}/main.py" ]]; then
-              STACK_TYPE="python"
-            elif [[ -f "${CONTEXT_DIR}/go.mod" ]]; then
-              STACK_TYPE="go"
-            elif [[ -f "${CONTEXT_DIR}/package.json" ]]; then
-              STACK_TYPE="node"
-            elif [[ -f "${CONTEXT_DIR}/composer.json" ]]; then
-              STACK_TYPE="php"
-            elif [[ -f "${CONTEXT_DIR}/Gemfile" ]]; then
-              STACK_TYPE="ruby"
-            elif [[ -f "${CONTEXT_DIR}/Cargo.toml" ]]; then
-              STACK_TYPE="rust"
-            elif compgen -G "${CONTEXT_DIR}/*.csproj" > /dev/null; then
-              STACK_TYPE="dotnet"
-            elif [[ -f "${CONTEXT_DIR}/mix.exs" ]]; then
-              STACK_TYPE="elixir"
-            elif [[ -f "${CONTEXT_DIR}/deno.json" || -f "${CONTEXT_DIR}/deno.jsonc" ]]; then
-              STACK_TYPE="deno"
-            else
-              echo "Could not detect a known backend language. Using generic Nixpacks backend build."
-              STACK_TYPE="generic"
-            fi
-          fi
-
-          # Normalize aliases before selecting build/start commands.
-          if [[ "${STACK_TYPE}" == "laravel" || "${STACK_TYPE}" == "backend-laravel" ]]; then
-            STACK_TYPE="php"
-          fi
-
-          # Resolve a single stack version input by stack type.
           case "${STACK_TYPE}" in
-            python|backend-python)
-              RESOLVED_STACK_VERSION="${STACK_VERSION}"
+            ""|back|backend|api)
+              STACK_TYPE="$(detect_stack_type)"
               ;;
-            java|backend-java)
-              RESOLVED_STACK_VERSION="${STACK_VERSION}"
-              ;;
-            go|backend-go)
-              RESOLVED_STACK_VERSION="${STACK_VERSION}"
-              ;;
-            php|backend-php)
-              RESOLVED_STACK_VERSION="${STACK_VERSION}"
-              # Laravel/PHP projects often compile frontend assets during the
-              # backend build, so keep a modern Node fallback for Vite.
-              RESOLVED_ASSET_NODE_VERSION="22"
-              ;;
-            node|backend-node)
-              RESOLVED_STACK_VERSION="${STACK_VERSION}"
+            backend-*)
+              STACK_TYPE="${STACK_TYPE#backend-}"
               ;;
           esac
 
-          # Pass explicit runtime versions only when they are provided.
-          if [[ "${STACK_TYPE}" == "python" || "${STACK_TYPE}" == "backend-python" ]] && [[ -n "${RESOLVED_STACK_VERSION}" ]]; then
-            NIXPACKS_ENV_ARGS+=(--env "NIXPACKS_PYTHON_VERSION=${RESOLVED_STACK_VERSION}")
+          if [[ "${STACK_TYPE}" == "laravel" ]]; then
+            STACK_TYPE="php"
           fi
 
-          if [[ "${STACK_TYPE}" == "java" || "${STACK_TYPE}" == "backend-java" ]] && [[ -n "${RESOLVED_STACK_VERSION}" ]]; then
-            NIXPACKS_ENV_ARGS+=(--env "NIXPACKS_JAVA_VERSION=${RESOLVED_STACK_VERSION}")
-          fi
-
-          if [[ "${STACK_TYPE}" == "go" || "${STACK_TYPE}" == "backend-go" ]] && [[ -n "${RESOLVED_STACK_VERSION}" ]]; then
-            NIXPACKS_ENV_ARGS+=(--env "NIXPACKS_GO_VERSION=${RESOLVED_STACK_VERSION}")
-          fi
-
-          if [[ "${STACK_TYPE}" == "php" || "${STACK_TYPE}" == "backend-php" ]] && [[ -n "${RESOLVED_STACK_VERSION}" ]]; then
-            NIXPACKS_ENV_ARGS+=(--env "NIXPACKS_PHP_VERSION=${RESOLVED_STACK_VERSION}")
-          fi
-
-          if [[ "${STACK_TYPE}" == "php" || "${STACK_TYPE}" == "backend-php" ]] && [[ -n "${RESOLVED_ASSET_NODE_VERSION}" ]]; then
-            NIXPACKS_ENV_ARGS+=(--env "NIXPACKS_NODE_VERSION=${RESOLVED_ASSET_NODE_VERSION}")
-          fi
-
-          if [[ "${STACK_TYPE}" == "node" || "${STACK_TYPE}" == "backend-node" ]] && [[ -n "${RESOLVED_STACK_VERSION}" ]]; then
-            NIXPACKS_ENV_ARGS+=(--env "NIXPACKS_NODE_VERSION=${RESOLVED_STACK_VERSION}")
-          fi
-
-          # Choose build and start behavior for each supported stack.
           case "${STACK_TYPE}" in
-            python|backend-python)
+            python)
               echo "Using Python stack"
-
-              if [[ -n "${NIXPACKS_BUILD_CMD}" ]]; then
-                NIXPACKS_CMD_ARGS+=(--build-cmd "${NIXPACKS_BUILD_CMD}")
-              elif [[ -f "${CONTEXT_DIR}/requirements.txt" ]]; then
-                NIXPACKS_CMD_ARGS+=(--build-cmd "pip install -r requirements.txt")
-              fi
-
-              if [[ -n "${NIXPACKS_START_CMD}" ]]; then
-                NIXPACKS_CMD_ARGS+=(--start-cmd "${NIXPACKS_START_CMD}")
-              elif [[ -f "${CONTEXT_DIR}/app.py" ]]; then
-                NIXPACKS_CMD_ARGS+=(--start-cmd "python app.py")
-              elif [[ -f "${CONTEXT_DIR}/main.py" ]]; then
-                NIXPACKS_CMD_ARGS+=(--start-cmd "python main.py")
-              fi
+              RUNTIME_ENV_NAME="NIXPACKS_PYTHON_VERSION"
+              [[ -f "${CONTEXT_DIR}/requirements.txt" ]] && DEFAULT_BUILD_CMD="pip install -r requirements.txt"
+              [[ -f "${CONTEXT_DIR}/app.py" ]] && DEFAULT_START_CMD="python app.py"
+              [[ -z "${DEFAULT_START_CMD}" && -f "${CONTEXT_DIR}/main.py" ]] && DEFAULT_START_CMD="python main.py"
               ;;
-
-            go|backend-go)
+            go)
               echo "Using Go stack"
-
-              if [[ -n "${NIXPACKS_BUILD_CMD}" ]]; then
-                NIXPACKS_CMD_ARGS+=(--build-cmd "${NIXPACKS_BUILD_CMD}")
-              else
-                NIXPACKS_CMD_ARGS+=(--build-cmd "go mod download && go build -o app")
-              fi
-
-              if [[ -n "${NIXPACKS_START_CMD}" ]]; then
-                NIXPACKS_CMD_ARGS+=(--start-cmd "${NIXPACKS_START_CMD}")
-              else
-                NIXPACKS_CMD_ARGS+=(--start-cmd "./app")
-              fi
+              RUNTIME_ENV_NAME="NIXPACKS_GO_VERSION"
+              DEFAULT_BUILD_CMD="go mod download && go build -o app"
+              DEFAULT_START_CMD="./app"
               ;;
-
-            java|backend-java)
+            java)
               echo "Using Java stack"
+              RUNTIME_ENV_NAME="NIXPACKS_JAVA_VERSION"
 
-              if [[ -n "${NIXPACKS_BUILD_CMD}" ]]; then
-                NIXPACKS_CMD_ARGS+=(--build-cmd "${NIXPACKS_BUILD_CMD}")
-              elif [[ -f "${CONTEXT_DIR}/pom.xml" ]]; then
-                NIXPACKS_CMD_ARGS+=(--build-cmd "mvn clean package -DskipTests")
+              if [[ -f "${CONTEXT_DIR}/pom.xml" ]]; then
+                DEFAULT_BUILD_CMD="mvn clean package -DskipTests"
+                DEFAULT_START_CMD="java -jar target/*.jar"
               elif [[ -f "${CONTEXT_DIR}/build.gradle" || -f "${CONTEXT_DIR}/gradlew" ]]; then
-                NIXPACKS_CMD_ARGS+=(--build-cmd "./gradlew build -x test")
+                DEFAULT_BUILD_CMD="./gradlew build -x test"
+                DEFAULT_START_CMD="java -jar build/libs/*.jar"
               else
                 echo "ERROR: Java project detected, but no pom.xml, build.gradle or gradlew found."
                 exit 1
               fi
-
-              if [[ -n "${NIXPACKS_START_CMD}" ]]; then
-                NIXPACKS_CMD_ARGS+=(--start-cmd "${NIXPACKS_START_CMD}")
-              elif [[ -f "${CONTEXT_DIR}/pom.xml" ]]; then
-                NIXPACKS_CMD_ARGS+=(--start-cmd "java -jar target/*.jar")
-              else
-                NIXPACKS_CMD_ARGS+=(--start-cmd "java -jar build/libs/*.jar")
-              fi
               ;;
-
-            node|backend-node)
-              echo "Using Node stack"
-
-              if [[ -n "${NIXPACKS_BUILD_CMD}" ]]; then
-                NIXPACKS_CMD_ARGS+=(--build-cmd "${NIXPACKS_BUILD_CMD}")
-              fi
-
-              if [[ -n "${NIXPACKS_START_CMD}" ]]; then
-                NIXPACKS_CMD_ARGS+=(--start-cmd "${NIXPACKS_START_CMD}")
-              fi
-              ;;
-
-            php|backend-php)
+            php)
               echo "Using PHP stack"
-
-              if [[ -n "${NIXPACKS_BUILD_CMD}" ]]; then
-                NIXPACKS_CMD_ARGS+=(--build-cmd "${NIXPACKS_BUILD_CMD}")
-              fi
-
-              if [[ -n "${NIXPACKS_START_CMD}" ]]; then
-                NIXPACKS_CMD_ARGS+=(--start-cmd "${NIXPACKS_START_CMD}")
-              fi
+              RUNTIME_ENV_NAME="NIXPACKS_PHP_VERSION"
+              # Laravel/PHP projects often compile frontend assets during the
+              # backend build, so keep a modern Node fallback for Vite.
+              ASSET_NODE_VERSION="22"
               ;;
-
-            ruby|backend-ruby)
-              echo "Using Ruby stack"
-
-              if [[ -n "${NIXPACKS_BUILD_CMD}" ]]; then
-                NIXPACKS_CMD_ARGS+=(--build-cmd "${NIXPACKS_BUILD_CMD}")
-              fi
-
-              if [[ -n "${NIXPACKS_START_CMD}" ]]; then
-                NIXPACKS_CMD_ARGS+=(--start-cmd "${NIXPACKS_START_CMD}")
-              fi
-              ;;
-
-            rust|backend-rust)
-              echo "Using Rust stack"
-
-              if [[ -n "${NIXPACKS_BUILD_CMD}" ]]; then
-                NIXPACKS_CMD_ARGS+=(--build-cmd "${NIXPACKS_BUILD_CMD}")
-              fi
-
-              if [[ -n "${NIXPACKS_START_CMD}" ]]; then
-                NIXPACKS_CMD_ARGS+=(--start-cmd "${NIXPACKS_START_CMD}")
-              fi
-              ;;
-
-            dotnet|backend-dotnet)
+            dotnet)
               echo "Using .NET stack"
-
-              if [[ -n "${NIXPACKS_BUILD_CMD}" ]]; then
-                NIXPACKS_CMD_ARGS+=(--build-cmd "${NIXPACKS_BUILD_CMD}")
-              fi
-
-              if [[ -n "${NIXPACKS_START_CMD}" ]]; then
-                NIXPACKS_CMD_ARGS+=(--start-cmd "${NIXPACKS_START_CMD}")
-              fi
               ;;
-
-            elixir|backend-elixir)
-              echo "Using Elixir stack"
-
-              if [[ -n "${NIXPACKS_BUILD_CMD}" ]]; then
-                NIXPACKS_CMD_ARGS+=(--build-cmd "${NIXPACKS_BUILD_CMD}")
-              fi
-
-              if [[ -n "${NIXPACKS_START_CMD}" ]]; then
-                NIXPACKS_CMD_ARGS+=(--start-cmd "${NIXPACKS_START_CMD}")
-              fi
-              ;;
-
-            deno|backend-deno)
-              echo "Using Deno stack"
-
-              if [[ -n "${NIXPACKS_BUILD_CMD}" ]]; then
-                NIXPACKS_CMD_ARGS+=(--build-cmd "${NIXPACKS_BUILD_CMD}")
-              fi
-
-              if [[ -n "${NIXPACKS_START_CMD}" ]]; then
-                NIXPACKS_CMD_ARGS+=(--start-cmd "${NIXPACKS_START_CMD}")
-              fi
-              ;;
-
             generic)
               echo "Using generic backend stack with Nixpacks auto-detection"
-
-              if [[ -n "${NIXPACKS_BUILD_CMD}" ]]; then
-                NIXPACKS_CMD_ARGS+=(--build-cmd "${NIXPACKS_BUILD_CMD}")
-              fi
-
-              if [[ -n "${NIXPACKS_START_CMD}" ]]; then
-                NIXPACKS_CMD_ARGS+=(--start-cmd "${NIXPACKS_START_CMD}")
-              fi
               ;;
-
             *)
               echo "ERROR: Unsupported backend STACK_TYPE: ${STACK_TYPE}"
-              echo "Allowed values: java, python, go, node, php, laravel, ruby, rust, dotnet, elixir, deno, back, backend, api"
+              echo "Allowed values: java, python, go, php, laravel, dotnet, back, backend, api"
               exit 1
               ;;
           esac
+
+          add_nixpacks_env "${RUNTIME_ENV_NAME}" "${STACK_VERSION}"
+          add_nixpacks_env "NIXPACKS_NODE_VERSION" "${ASSET_NODE_VERSION}"
+          add_nixpacks_cmd_arg --build-cmd "${NIXPACKS_BUILD_CMD:-$DEFAULT_BUILD_CMD}"
+          add_nixpacks_cmd_arg --start-cmd "${NIXPACKS_START_CMD:-$DEFAULT_START_CMD}"
 
           # Build the image locally with Nixpacks before pushing it.
           timeout 20m nixpacks build "${CONTEXT_DIR}" \
