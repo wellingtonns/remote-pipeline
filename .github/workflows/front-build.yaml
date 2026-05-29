@@ -133,6 +133,7 @@ jobs:
           FRONTEND_ENV_ARGS=()
           NIXPACKS_CMD_ARGS=()
           NIXPACKS_ENV_ARGS=()
+          RESOLVED_STACK_VERSION="${STACK_VERSION:-22}"
           FRONTEND_ENV_FILE="${CONTEXT_DIR%/}/.env.local"
 
           mkdir -p "${CONTEXT_DIR}"
@@ -159,9 +160,9 @@ jobs:
 
           echo "Prepared $(wc -l < "${FRONTEND_ENV_FILE}" | xargs) frontend environment variables"
 
-          if [[ -n "${STACK_VERSION}" ]]; then
-            NIXPACKS_ENV_ARGS+=(--env "NIXPACKS_NODE_VERSION=${STACK_VERSION}")
-          fi
+          # Frontend builds are more sensitive to Node runtime drift, so use
+          # a safe default when the caller does not pin STACK_VERSION.
+          NIXPACKS_ENV_ARGS+=(--env "NIXPACKS_NODE_VERSION=${RESOLVED_STACK_VERSION}")
 
           case "${STACK_TYPE}" in
             front|react)
