@@ -165,8 +165,8 @@ jobs:
           NIXPACKS_ENV_ARGS+=(--env "NIXPACKS_NODE_VERSION=${RESOLVED_STACK_VERSION}")
 
           case "${STACK_TYPE}" in
-            front|react)
-              echo "Using React stack"
+            front|react|node)
+              echo "Using frontend Node/React stack"
 
               if [[ -n "${NIXPACKS_BUILD_CMD}" ]]; then
                 NIXPACKS_CMD_ARGS+=(--build-cmd "${NIXPACKS_BUILD_CMD}")
@@ -199,7 +199,7 @@ jobs:
 
             *)
               echo "ERROR: Unsupported frontend STACK_TYPE: ${STACK_TYPE}"
-              echo "Allowed values: front, react, next"
+              echo "Allowed values: front, react, node, next"
               exit 1
               ;;
           esac
