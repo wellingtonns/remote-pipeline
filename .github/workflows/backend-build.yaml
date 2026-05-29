@@ -137,6 +137,7 @@ jobs:
           NIXPACKS_CMD_ARGS=()
           NIXPACKS_ENV_ARGS=()
           RESOLVED_STACK_VERSION=""
+          RESOLVED_ASSET_NODE_VERSION=""
 
           # Auto-detect the backend stack when a generic stack type is used.
           if [[ -z "${STACK_TYPE}" || "${STACK_TYPE}" == "back" || "${STACK_TYPE}" == "backend" || "${STACK_TYPE}" == "api" ]]; then
@@ -186,6 +187,9 @@ jobs:
               ;;
             php|backend-php)
               RESOLVED_STACK_VERSION="${STACK_VERSION}"
+              # Laravel/PHP projects often compile frontend assets during the
+              # backend build, so keep a modern Node fallback for Vite.
+              RESOLVED_ASSET_NODE_VERSION="22"
               ;;
             node|backend-node)
               RESOLVED_STACK_VERSION="${STACK_VERSION}"
@@ -207,6 +211,10 @@ jobs:
 
           if [[ "${STACK_TYPE}" == "php" || "${STACK_TYPE}" == "backend-php" ]] && [[ -n "${RESOLVED_STACK_VERSION}" ]]; then
             NIXPACKS_ENV_ARGS+=(--env "NIXPACKS_PHP_VERSION=${RESOLVED_STACK_VERSION}")
+          fi
+
+          if [[ "${STACK_TYPE}" == "php" || "${STACK_TYPE}" == "backend-php" ]] && [[ -n "${RESOLVED_ASSET_NODE_VERSION}" ]]; then
+            NIXPACKS_ENV_ARGS+=(--env "NIXPACKS_NODE_VERSION=${RESOLVED_ASSET_NODE_VERSION}")
           fi
 
           if [[ "${STACK_TYPE}" == "node" || "${STACK_TYPE}" == "backend-node" ]] && [[ -n "${RESOLVED_STACK_VERSION}" ]]; then
