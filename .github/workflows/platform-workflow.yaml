@@ -57,12 +57,12 @@ jobs:
               echo "Stack type '${{ inputs.STACK_TYPE }}' is supported as legacy alias."
               ;;
 
-            next|react|back|backend|api|go|python|java|php|laravel)
+            next|react|node|back|backend|api|go|python|java|php|laravel)
               echo "Stack type '${{ inputs.STACK_TYPE }}' is supported."
               ;;
 
             *)
-              echo "Unsupported STACK_TYPE: '${{ inputs.STACK_TYPE }}'. Supported values: front, next, react, back, backend, api, go, python, java, php, laravel"
+              echo "Unsupported STACK_TYPE: '${{ inputs.STACK_TYPE }}'. Supported values: front, next, react, node, back, backend, api, go, python, java, php, laravel"
               exit 1
               ;;
           esac
@@ -132,7 +132,7 @@ jobs:
 
   build-05-backend:
     name: "Backend"
-    if: ${{ inputs.STACK_TYPE == 'back' || inputs.STACK_TYPE == 'backend' || inputs.STACK_TYPE == 'api' || inputs.STACK_TYPE == 'python' || inputs.STACK_TYPE == 'java' || inputs.STACK_TYPE == 'go' || inputs.STACK_TYPE == 'php' || inputs.STACK_TYPE == 'laravel' }}
+    if: ${{ inputs.STACK_TYPE == 'back' || inputs.STACK_TYPE == 'backend' || inputs.STACK_TYPE == 'api' || inputs.STACK_TYPE == 'node' || inputs.STACK_TYPE == 'python' || inputs.STACK_TYPE == 'java' || inputs.STACK_TYPE == 'go' || inputs.STACK_TYPE == 'php' || inputs.STACK_TYPE == 'laravel' }}
     needs: [prep-03-resolve]
     uses: wellingtonns/remote-pipeline/.github/workflows/backend-build.yaml@devops
     with:
