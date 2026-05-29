@@ -71,7 +71,7 @@ permissions:
 
 jobs:
   build:
-    name: build-image-and-push
+    name: Build Image ${{ inputs.STACK_TYPE }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
