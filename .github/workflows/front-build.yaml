@@ -165,8 +165,8 @@ jobs:
           NIXPACKS_ENV_ARGS+=(--env "NIXPACKS_NODE_VERSION=${RESOLVED_STACK_VERSION}")
 
           case "${STACK_TYPE}" in
-            front|react|node)
-              echo "Using frontend Node/React stack"
+            front|react)
+              echo "Using React stack"
 
               if [[ -n "${NIXPACKS_BUILD_CMD}" ]]; then
                 NIXPACKS_CMD_ARGS+=(--build-cmd "${NIXPACKS_BUILD_CMD}")
@@ -178,6 +178,24 @@ jobs:
                 NIXPACKS_CMD_ARGS+=(--start-cmd "${NIXPACKS_START_CMD}")
               else
                 NIXPACKS_CMD_ARGS+=(--start-cmd "npx --yes serve -s build -l 3000")
+              fi
+              ;;
+
+            node)
+              echo "Using generic Node web stack"
+
+              if [[ -n "${NIXPACKS_BUILD_CMD}" ]]; then
+                NIXPACKS_CMD_ARGS+=(--build-cmd "${NIXPACKS_BUILD_CMD}")
+              elif [[ -f "${CONTEXT_DIR}/package.json" ]]; then
+                NIXPACKS_CMD_ARGS+=(--build-cmd "npm install")
+              fi
+
+              if [[ -n "${NIXPACKS_START_CMD}" ]]; then
+                NIXPACKS_CMD_ARGS+=(--start-cmd "${NIXPACKS_START_CMD}")
+              elif [[ -f "${CONTEXT_DIR}/server.js" ]]; then
+                NIXPACKS_CMD_ARGS+=(--start-cmd "node server.js")
+              else
+                NIXPACKS_CMD_ARGS+=(--start-cmd "npm start")
               fi
               ;;
 
