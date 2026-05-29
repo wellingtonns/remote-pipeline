@@ -27,10 +27,10 @@ on:
         required: false
         type: string
         default: dev
-      NODE_VERSION:
+      STACK_VERSION:
         required: false
         type: string
-        default: "20"
+        default: ""
       NODE_MAX_OLD_SPACE_MB:
         required: false
         type: string
@@ -59,7 +59,7 @@ env:
   CONTEXT_DIR: ${{ inputs.CONTEXT_DIR }}
   APPLICATION: ${{ inputs.APPLICATION }}
   ENVIRONMENT: ${{ inputs.ENVIRONMENT }}
-  NODE_VERSION: ${{ inputs.NODE_VERSION }}
+  STACK_VERSION: ${{ inputs.STACK_VERSION }}
   NODE_MAX_OLD_SPACE_MB: ${{ inputs.NODE_MAX_OLD_SPACE_MB }}
   NIXPACKS_BUILD_CMD: ${{ inputs.NIXPACKS_BUILD_CMD }}
   NIXPACKS_START_CMD: ${{ inputs.NIXPACKS_START_CMD }}
@@ -105,7 +105,7 @@ jobs:
           STACK_TYPE: ${{ inputs.STACK_TYPE }}
           CONTEXT_DIR: ${{ inputs.CONTEXT_DIR }}
           ENVIRONMENT: ${{ inputs.ENVIRONMENT }}
-          NODE_VERSION: ${{ inputs.NODE_VERSION }}
+          STACK_VERSION: ${{ inputs.STACK_VERSION }}
           NODE_MAX_OLD_SPACE_MB: ${{ inputs.NODE_MAX_OLD_SPACE_MB }}
           NIXPACKS_BUILD_CMD: ${{ inputs.NIXPACKS_BUILD_CMD }}
           NIXPACKS_START_CMD: ${{ inputs.NIXPACKS_START_CMD }}
@@ -132,6 +132,7 @@ jobs:
           SHOULD_PUSH_LATEST="false"
           FRONTEND_ENV_ARGS=()
           NIXPACKS_CMD_ARGS=()
+          NIXPACKS_ENV_ARGS=()
           FRONTEND_ENV_FILE="${CONTEXT_DIR%/}/.env.local"
 
           mkdir -p "${CONTEXT_DIR}"
@@ -157,6 +158,10 @@ jobs:
           )
 
           echo "Prepared $(wc -l < "${FRONTEND_ENV_FILE}" | xargs) frontend environment variables"
+
+          if [[ -n "${STACK_VERSION}" ]]; then
+            NIXPACKS_ENV_ARGS+=(--env "NIXPACKS_NODE_VERSION=${STACK_VERSION}")
+          fi
 
           case "${STACK_TYPE}" in
             front|react)
@@ -200,8 +205,8 @@ jobs:
 
           timeout 20m nixpacks build "${CONTEXT_DIR}" \
             --env APP_ENV="${ENVIRONMENT}" \
-            --env NIXPACKS_NODE_VERSION="${NODE_VERSION}" \
             --env NODE_OPTIONS="--max_old_space_size=${NODE_MAX_OLD_SPACE_MB}" \
+            "${NIXPACKS_ENV_ARGS[@]}" \
             "${FRONTEND_ENV_ARGS[@]}" \
             "${NIXPACKS_CMD_ARGS[@]}" \
             --platform linux/amd64 \

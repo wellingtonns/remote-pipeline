@@ -32,10 +32,10 @@ on:
         required: false
         type: string
         default: dev
-      NODE_VERSION:
+      STACK_VERSION:
         required: false
         type: string
-        default: "22"
+        default: ""
 
       NIXPACKS_BUILD_CMD:
         required: false
@@ -64,7 +64,7 @@ env:
   CONTEXT_DIR: ${{ inputs.CONTEXT_DIR }}
   APPLICATION: ${{ inputs.APPLICATION }}
   ENVIRONMENT: ${{ inputs.ENVIRONMENT }}
-  NODE_VERSION: ${{ inputs.NODE_VERSION }}
+  STACK_VERSION: ${{ inputs.STACK_VERSION }}
   NIXPACKS_BUILD_CMD: ${{ inputs.NIXPACKS_BUILD_CMD }}
   NIXPACKS_START_CMD: ${{ inputs.NIXPACKS_START_CMD }}
   PUSH_LATEST_BRANCHES: ${{ inputs.PUSH_LATEST_BRANCHES }}
@@ -108,13 +108,14 @@ jobs:
           REGISTRY: ${{ inputs.REGISTRY }}
           IMAGE_REPOSITORY: ${{ inputs.IMAGE_REPOSITORY }}
           ENVIRONMENT: ${{ inputs.ENVIRONMENT }}
-          NODE_VERSION: ${{ inputs.NODE_VERSION }}
+          STACK_VERSION: ${{ inputs.STACK_VERSION }}
           NIXPACKS_BUILD_CMD: ${{ inputs.NIXPACKS_BUILD_CMD }}
           NIXPACKS_START_CMD: ${{ inputs.NIXPACKS_START_CMD }}
           PUSH_LATEST_BRANCHES: ${{ inputs.PUSH_LATEST_BRANCHES }}
         run: |
           set -euxo pipefail
 
+          # Install Nixpacks in the runner.
           curl -fsSL https://nixpacks.com/install.sh | bash
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           export PATH="$HOME/.local/bin:$PATH"
@@ -124,6 +125,7 @@ jobs:
             exit 1
           fi
 
+          # Resolve image tags used during build and publish.
           IMAGE_REPO_LOWER="$(echo "${IMAGE_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
           IMAGE_BASE="${REGISTRY}/${IMAGE_REPO_LOWER}"
 
@@ -133,7 +135,10 @@ jobs:
 
           SHOULD_PUSH_LATEST="false"
           NIXPACKS_CMD_ARGS=()
+          NIXPACKS_ENV_ARGS=()
+          RESOLVED_STACK_VERSION=""
 
+          # Auto-detect the backend stack when a generic stack type is used.
           if [[ -z "${STACK_TYPE}" || "${STACK_TYPE}" == "back" || "${STACK_TYPE}" == "backend" || "${STACK_TYPE}" == "api" ]]; then
             echo "Detecting backend stack automatically..."
 
@@ -163,6 +168,52 @@ jobs:
             fi
           fi
 
+          # Normalize aliases before selecting build/start commands.
+          if [[ "${STACK_TYPE}" == "laravel" || "${STACK_TYPE}" == "backend-laravel" ]]; then
+            STACK_TYPE="php"
+          fi
+
+          # Resolve a single stack version input by stack type.
+          case "${STACK_TYPE}" in
+            python|backend-python)
+              RESOLVED_STACK_VERSION="${STACK_VERSION}"
+              ;;
+            java|backend-java)
+              RESOLVED_STACK_VERSION="${STACK_VERSION}"
+              ;;
+            go|backend-go)
+              RESOLVED_STACK_VERSION="${STACK_VERSION}"
+              ;;
+            php|backend-php)
+              RESOLVED_STACK_VERSION="${STACK_VERSION}"
+              ;;
+            node|backend-node)
+              RESOLVED_STACK_VERSION="${STACK_VERSION}"
+              ;;
+          esac
+
+          # Pass explicit runtime versions only when they are provided.
+          if [[ "${STACK_TYPE}" == "python" || "${STACK_TYPE}" == "backend-python" ]] && [[ -n "${RESOLVED_STACK_VERSION}" ]]; then
+            NIXPACKS_ENV_ARGS+=(--env "NIXPACKS_PYTHON_VERSION=${RESOLVED_STACK_VERSION}")
+          fi
+
+          if [[ "${STACK_TYPE}" == "java" || "${STACK_TYPE}" == "backend-java" ]] && [[ -n "${RESOLVED_STACK_VERSION}" ]]; then
+            NIXPACKS_ENV_ARGS+=(--env "NIXPACKS_JAVA_VERSION=${RESOLVED_STACK_VERSION}")
+          fi
+
+          if [[ "${STACK_TYPE}" == "go" || "${STACK_TYPE}" == "backend-go" ]] && [[ -n "${RESOLVED_STACK_VERSION}" ]]; then
+            NIXPACKS_ENV_ARGS+=(--env "NIXPACKS_GO_VERSION=${RESOLVED_STACK_VERSION}")
+          fi
+
+          if [[ "${STACK_TYPE}" == "php" || "${STACK_TYPE}" == "backend-php" ]] && [[ -n "${RESOLVED_STACK_VERSION}" ]]; then
+            NIXPACKS_ENV_ARGS+=(--env "NIXPACKS_PHP_VERSION=${RESOLVED_STACK_VERSION}")
+          fi
+
+          if [[ "${STACK_TYPE}" == "node" || "${STACK_TYPE}" == "backend-node" ]] && [[ -n "${RESOLVED_STACK_VERSION}" ]]; then
+            NIXPACKS_ENV_ARGS+=(--env "NIXPACKS_NODE_VERSION=${RESOLVED_STACK_VERSION}")
+          fi
+
+          # Choose build and start behavior for each supported stack.
           case "${STACK_TYPE}" in
             python|backend-python)
               echo "Using Python stack"
@@ -221,8 +272,92 @@ jobs:
               fi
               ;;
 
-            node|backend-node|php|backend-php|ruby|backend-ruby|rust|backend-rust|dotnet|backend-dotnet|elixir|backend-elixir|deno|backend-deno|generic)
-              echo "Using ${STACK_TYPE} backend stack with Nixpacks auto-detection"
+            node|backend-node)
+              echo "Using Node stack"
+
+              if [[ -n "${NIXPACKS_BUILD_CMD}" ]]; then
+                NIXPACKS_CMD_ARGS+=(--build-cmd "${NIXPACKS_BUILD_CMD}")
+              fi
+
+              if [[ -n "${NIXPACKS_START_CMD}" ]]; then
+                NIXPACKS_CMD_ARGS+=(--start-cmd "${NIXPACKS_START_CMD}")
+              fi
+              ;;
+
+            php|backend-php)
+              echo "Using PHP stack"
+
+              if [[ -n "${NIXPACKS_BUILD_CMD}" ]]; then
+                NIXPACKS_CMD_ARGS+=(--build-cmd "${NIXPACKS_BUILD_CMD}")
+              fi
+
+              if [[ -n "${NIXPACKS_START_CMD}" ]]; then
+                NIXPACKS_CMD_ARGS+=(--start-cmd "${NIXPACKS_START_CMD}")
+              fi
+              ;;
+
+            ruby|backend-ruby)
+              echo "Using Ruby stack"
+
+              if [[ -n "${NIXPACKS_BUILD_CMD}" ]]; then
+                NIXPACKS_CMD_ARGS+=(--build-cmd "${NIXPACKS_BUILD_CMD}")
+              fi
+
+              if [[ -n "${NIXPACKS_START_CMD}" ]]; then
+                NIXPACKS_CMD_ARGS+=(--start-cmd "${NIXPACKS_START_CMD}")
+              fi
+              ;;
+
+            rust|backend-rust)
+              echo "Using Rust stack"
+
+              if [[ -n "${NIXPACKS_BUILD_CMD}" ]]; then
+                NIXPACKS_CMD_ARGS+=(--build-cmd "${NIXPACKS_BUILD_CMD}")
+              fi
+
+              if [[ -n "${NIXPACKS_START_CMD}" ]]; then
+                NIXPACKS_CMD_ARGS+=(--start-cmd "${NIXPACKS_START_CMD}")
+              fi
+              ;;
+
+            dotnet|backend-dotnet)
+              echo "Using .NET stack"
+
+              if [[ -n "${NIXPACKS_BUILD_CMD}" ]]; then
+                NIXPACKS_CMD_ARGS+=(--build-cmd "${NIXPACKS_BUILD_CMD}")
+              fi
+
+              if [[ -n "${NIXPACKS_START_CMD}" ]]; then
+                NIXPACKS_CMD_ARGS+=(--start-cmd "${NIXPACKS_START_CMD}")
+              fi
+              ;;
+
+            elixir|backend-elixir)
+              echo "Using Elixir stack"
+
+              if [[ -n "${NIXPACKS_BUILD_CMD}" ]]; then
+                NIXPACKS_CMD_ARGS+=(--build-cmd "${NIXPACKS_BUILD_CMD}")
+              fi
+
+              if [[ -n "${NIXPACKS_START_CMD}" ]]; then
+                NIXPACKS_CMD_ARGS+=(--start-cmd "${NIXPACKS_START_CMD}")
+              fi
+              ;;
+
+            deno|backend-deno)
+              echo "Using Deno stack"
+
+              if [[ -n "${NIXPACKS_BUILD_CMD}" ]]; then
+                NIXPACKS_CMD_ARGS+=(--build-cmd "${NIXPACKS_BUILD_CMD}")
+              fi
+
+              if [[ -n "${NIXPACKS_START_CMD}" ]]; then
+                NIXPACKS_CMD_ARGS+=(--start-cmd "${NIXPACKS_START_CMD}")
+              fi
+              ;;
+
+            generic)
+              echo "Using generic backend stack with Nixpacks auto-detection"
 
               if [[ -n "${NIXPACKS_BUILD_CMD}" ]]; then
                 NIXPACKS_CMD_ARGS+=(--build-cmd "${NIXPACKS_BUILD_CMD}")
@@ -235,22 +370,23 @@ jobs:
 
             *)
               echo "ERROR: Unsupported backend STACK_TYPE: ${STACK_TYPE}"
-              echo "Allowed values: java, python, go, node, php, ruby, rust, dotnet, elixir, deno, back, backend, api"
+              echo "Allowed values: java, python, go, node, php, laravel, ruby, rust, dotnet, elixir, deno, back, backend, api"
               exit 1
               ;;
           esac
 
+          # Build the image locally with Nixpacks before pushing it.
           timeout 20m nixpacks build "${CONTEXT_DIR}" \
             --env APP_ENV="${ENVIRONMENT}" \
-            --env NIXPACKS_NODE_VERSION="${NODE_VERSION}" \
+            "${NIXPACKS_ENV_ARGS[@]}" \
             "${NIXPACKS_CMD_ARGS[@]}" \
             --platform linux/amd64 \
             --tag "${AMD_TAG}"
 
           docker push "${AMD_TAG}"
-
           docker buildx imagetools create -t "${SHA_TAG}" "${AMD_TAG}"
 
+          # Publish latest-environment tag only for allowed branches.
           IFS=',' read -r -a BRANCHES <<< "${PUSH_LATEST_BRANCHES}"
 
           for BR in "${BRANCHES[@]}"; do
