@@ -115,7 +115,7 @@ jobs:
     secrets: inherit
 
   build-05-front:
-    name: "BUILD | Front Image"
+    name: "Frontend"
     if: ${{ inputs.STACK_TYPE == 'front' || inputs.STACK_TYPE == 'next' || inputs.STACK_TYPE == 'react' }}
     needs: [prep-03-resolve]
     uses: wellingtonns/remote-pipeline/.github/workflows/front-build.yaml@devops
@@ -131,7 +131,7 @@ jobs:
     secrets: inherit
 
   build-05-backend:
-    name: "BUILD | Backend image"
+    name: "Backend"
     if: ${{ inputs.STACK_TYPE == 'back' || inputs.STACK_TYPE == 'backend' || inputs.STACK_TYPE == 'api' || inputs.STACK_TYPE == 'python' || inputs.STACK_TYPE == 'java' || inputs.STACK_TYPE == 'go' || inputs.STACK_TYPE == 'php' || inputs.STACK_TYPE == 'laravel' }}
     needs: [prep-03-resolve]
     uses: wellingtonns/remote-pipeline/.github/workflows/backend-build.yaml@devops
